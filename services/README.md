@@ -7,4 +7,8 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 - **Main purpose**: to centralize all the backend logic, APIs, and queue consumers that support the company's use cases.
 - **Recommendation**: document in this file (or in sub-READMEs) the services you add, their objective, the technology used, and how to run them.
 
+## Current services
+
+- [`support-api/`](./support-api/README.md): private FastAPI API for managed internal login and Nexova support tickets. It uses bcrypt, JWT, and TinyDB; public account registration is disabled.
+
 > _Spanish version: [README.es.md](./README.es.md)._
