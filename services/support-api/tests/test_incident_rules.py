@@ -2,6 +2,7 @@ import unittest
 from datetime import date
 from unittest.mock import patch
 
+from app.db import incidents
 from app.incident_rules import generate_ticket_id, validate_incident_data
 from app.main import forgot_password
 from app.schemas import (
@@ -61,6 +62,9 @@ class IncidentRulesTests(unittest.TestCase):
             generate_ticket_id(["NXV-000002", "invalid"]),
             "NXV-000003",
         )
+
+    def test_nexova_incidents_use_an_isolated_table(self):
+        self.assertEqual(incidents.name, "nexova_incidents")
 
     def test_public_ticket_schema_excludes_customer_email(self):
         public_data = {

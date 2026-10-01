@@ -123,3 +123,9 @@
 - TestClient: health público, tickets protegidos, endpoints auth y recuperación registrados, token inválido rechazado y autorregistro ausente.
 - `python -m compileall`, `node --check`, diagnósticos de archivos modificados y `git diff --check`: aprobados.
 - El envío no se probó contra Resend real porque no se usa ni se guarda la clave proporcionada en el chat.
+
+## Aislamiento de incidencias Nexova (2026-10-01)
+
+- Se corrigieron respuestas `500` en el listado y resumen autenticados causadas por 12 incidencias heredadas de `monorepo-auth` con un esquema incompatible.
+- La API usa ahora la tabla TinyDB `nexova_incidents`; la tabla heredada `incidents` permanece intacta y no se presenta como información real de Nexova.
+- La validación autenticada devuelve lista vacía y resumen con total 0 hasta que se creen tickets Nexova o se incorpore el CSV real.
