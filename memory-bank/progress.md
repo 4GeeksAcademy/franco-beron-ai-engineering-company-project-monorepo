@@ -129,3 +129,11 @@
 - Se corrigieron respuestas `500` en el listado y resumen autenticados causadas por 12 incidencias heredadas de `monorepo-auth` con un esquema incompatible.
 - La API usa ahora la tabla TinyDB `nexova_incidents`; la tabla heredada `incidents` permanece intacta y no se presenta como información real de Nexova.
 - La validación autenticada devuelve lista vacía y resumen con total 0 hasta que se creen tickets Nexova o se incorpore el CSV real.
+
+## Rediseño UI/UX del backoffice (2026-10-01)
+
+- Se aplicó la guía `ui-ux-pro-max` al backoffice estático, manteniendo intactos los flujos de autenticación, recuperación, tickets, filtros y cambios de estado.
+- Se implementó una consola operativa responsive con sistema de color semántico, iconos Lucide, navegación compacta, KPIs, barras de distribución y estados vacíos/carga/error.
+- Se mejoraron accesibilidad y ergonomía con foco visible, labels persistentes, targets de al menos 44 px, toggle de contraseña, navegación activa y soporte para `prefers-reduced-motion`.
+- Playwright validó vistas de 1440 x 1000 y 375 x 812 sin overflow horizontal, controles pequeños, errores de consola ni excepciones de página.
+- `node --check`, diagnósticos del editor y carga HTTP de HTML, CSS y JavaScript: aprobados.

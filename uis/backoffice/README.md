@@ -11,6 +11,7 @@ Entregar una vista inicial con contexto operativo relevante: SLA, tamano del equ
 - HTML
 - CSS
 - JavaScript (modulos ES)
+- Lucide Icons (carga fija desde CDN)
 - API central FastAPI en `services/support-api`
 
 ## Ejecutar local
@@ -40,5 +41,7 @@ Abrir `http://127.0.0.1:4174/`.
 ## Alcance actual
 
 - Ruta `/` protegida por login interno.
-- Layout propio (sidebar + content), distinto al website publico.
+- Consola operativa responsive con navegacion lateral en escritorio y barra compacta en movil.
+- Sistema visual accesible con foco visible, controles tactiles de al menos 44 px y movimiento reducido cuando el sistema lo solicita.
+- Indicadores de SLA, resumen de tickets, filtros, estados y feedback de carga/error diferenciados visualmente.
 - Resumen operativo, alta y seguimiento de tickets alineados con `CONTEXT.md`.
