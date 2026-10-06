@@ -137,3 +137,24 @@
 - Se mejoraron accesibilidad y ergonomía con foco visible, labels persistentes, targets de al menos 44 px, toggle de contraseña, navegación activa y soporte para `prefers-reduced-motion`.
 - Playwright validó vistas de 1440 x 1000 y 375 x 812 sin overflow horizontal, controles pequeños, errores de consola ni excepciones de página.
 - `node --check`, diagnósticos del editor y carga HTTP de HTML, CSS y JavaScript: aprobados.
+
+## Contenedorización del monorepo (2026-10-06)
+
+- Se adaptaron website y backoffice a wrappers Next.js conservando sus módulos, estilos y comportamiento existentes.
+- `uis/Dockerfile` usa Node Alpine, instala dependencias por aplicación y ejecuta ambos procesos mediante `uis/start.sh` en los puertos 3000 y 3001.
+- `services/Dockerfile` usa Python slim, instala `uv` y carga las dependencias FastAPI con `uv pip install`.
+- `docker-compose.yml` orquesta `interfaces` y `backend` con bind mounts, recarga en caliente y la red explícita `nexova-dev-network`.
+- El backoffice solicita `/backend/*` y Next reenvía a `http://backend:8001`; no hay URLs `localhost` en el código cliente.
+- Se añadieron `.dockerignore` para `uis/` y `services/`, una plantilla `.env.example` sin secretos y exclusiones raíz para `.env`, Node y Next.
+
+### Validaciones de contenedores
+
+- `docker compose up -d --build`: ambos servicios construidos e iniciados correctamente.
+- `docker compose ps`: backend saludable e interfaces en ejecución.
+- Website `:3000`, backoffice `:3001`, API `:8001` y proxy `/backend/health`: respuestas correctas.
+- Resolución interna desde `interfaces` hacia `http://backend:8001/health`: `200 OK`.
+- Suite backend dentro del contenedor: 15 pruebas aprobadas.
+- Builds Next de website y backoffice: aprobados; auditorías npm sin vulnerabilidades.
+- `docker compose config --quiet`, `sh -n`, `node --check`, diagnósticos y `git diff --check`: aprobados.
+- Bind mount `uis/` hacia `/app` confirmado para recarga en caliente.
+- `.env` ignorado, no rastreado y ausente del historial Git.

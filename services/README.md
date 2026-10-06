@@ -11,4 +11,12 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 
 - [`support-api/`](./support-api/README.md): private FastAPI API for managed internal login and Nexova support tickets. It uses bcrypt, JWT, and TinyDB; public account registration is disabled.
 
+## Docker development
+
+`services/Dockerfile` uses Python slim, installs `uv`, and installs the support API requirements with `uv pip install`. The root Compose file bind-mounts `services/` and runs Uvicorn with `--reload` on port 8001.
+
+```bash
+docker compose up
+```
+
 > _Spanish version: [README.es.md](./README.es.md)._
