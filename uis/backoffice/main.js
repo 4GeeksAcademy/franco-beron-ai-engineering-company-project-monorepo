@@ -223,6 +223,7 @@ function renderDashboard() {
       <nav aria-label="Navegación principal">
         <a class="nav-link active" href="#resumen">${icon("layout-dashboard")}<span>Resumen</span></a>
         <a class="nav-link" href="/backoffice/inventory/products">${icon("boxes")}<span>Inventario</span></a>
+        <a class="nav-link" href="/backoffice/suppliers">${icon("building-2")}<span>Proveedores</span></a>
         <a class="nav-link" href="#tickets">${icon("inbox")}<span>Tickets</span></a>
         <a class="nav-link" href="#prioridades">${icon("list-checks")}<span>Prioridades</span></a>
         <a class="nav-link" href="#privacidad">${icon("shield-check")}<span>Privacidad</span></a>

@@ -202,3 +202,17 @@
 - Build de Next aprobado; las cuatro rutas devolvieron HTTP 200 y el proxy `/backend/health` devolvió estado `ok`.
 - El backend de inventario real está disponible y sus endpoints de lectura devolvieron los datos semilla previamente verificados.
 - No se completó prueba visual Playwright: el instalador de Chromium no soporta Ubuntu 20.04 en este entorno. No se añadieron dependencias de navegador al proyecto.
+
+## Directorio de proveedores Nexova (2026-10-10)
+
+- Se creó `feature/directorio-proveedores` desde `feature/interfaz-visual` para aislar este proyecto previo y preservar inventario/backoffice existentes.
+- Se añadieron schemas Pydantic `Supplier` separados por operación, validación de categorías/estado, tarifa positiva, moneda por país, email y fecha ISO. `updated_at` lo genera el servidor y se modifica al cambiar tarifa.
+- Se añadió una tabla TinyDB independiente `suppliers` y los endpoints list/create/detail/update-rate/update-status/delete con filtros por `country` y `category`, `404` para IDs ausentes y `422` para entrada inválida.
+- Se configuró `uv run seed` con los 15 registros oficiales de Nexova; primera ejecución insertó 15 y la segunda 0, sin duplicar. `db.json` sigue ignorado por Git.
+- Se añadió `/backoffice/suppliers` al menú y una tabla filtrable con alta, tarifas editables, estados diferenciados y renovaciones próximas destacadas; se reutiliza la sesión y el shell existente.
+- Pruebas HTTP contra el backend activo: 15 registros, filtros Spain/ATS, CRUD, timestamp, estados, `422` y `404`; registro de prueba eliminado al finalizar.
+- Seeder `uv run seed`: primera ejecución insertó 15 registros y la repetición insertó cero duplicados.
+- API real: listados/filtros devolvieron 15 proveedores, 8 de Spain y 2 de `ats_software`; alta/lectura, tarifa con `updated_at`, suspensión, DELETE `200`, IDs ausentes `404` e invalidaciones `422` aprobadas. Se eliminó el registro temporal de prueba.
+- Suite backend existente: 15 pruebas aprobadas; `compileall`, `uv lock --check` y `git diff --check` aprobados.
+- Build Next aprobado; `/backoffice/suppliers` y las cuatro rutas de inventario devolvieron HTTP `200`; proxy `/backend/health` respondió `ok`.
+- No se ejecutó prueba visual Playwright por la incompatibilidad de Chromium con Ubuntu 20.04 del contenedor.

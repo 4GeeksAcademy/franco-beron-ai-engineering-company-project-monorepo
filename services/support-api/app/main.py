@@ -40,6 +40,7 @@ from app.schemas import (
     UserPublic,
 )
 from app.routers.inventory import router as inventory_router
+from app.routers.suppliers import router as suppliers_router
 from app.security import (
     create_access_token,
     create_reset_token,
@@ -57,6 +58,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Nexova Support API", lifespan=lifespan)
 app.include_router(inventory_router)
+app.include_router(suppliers_router)
 logger = logging.getLogger(__name__)
 app.add_middleware(
     CORSMiddleware,
@@ -79,8 +81,14 @@ async def request_validation_handler(
 ):
     first_error = exc.errors()[0]
     location = first_error.get("loc", [])
+    validation_status = (
+        status.HTTP_422_UNPROCESSABLE_ENTITY
+        if request.url.path == "/suppliers"
+        or request.url.path.startswith("/suppliers/")
+        else status.HTTP_400_BAD_REQUEST
+    )
     return JSONResponse(
-        status_code=400,
+        status_code=validation_status,
         content={
             "error": "validation_error",
             "field": str(location[-1]) if location else "unknown",
