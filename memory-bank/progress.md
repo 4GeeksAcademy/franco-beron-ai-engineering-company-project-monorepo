@@ -1,5 +1,16 @@
 # Progress Log
 
+## Propuesta de arquitectura de backend (2026-10-10)
+
+- Se creó `feature/arq-proposal` desde `feature/directorio-proveedores`, con árbol de trabajo limpio al iniciar.
+- Se añadió `docs/ARCHITECTURE_PROPOSAL.md` como entregable documental de la consigna oficial; no se modificó código funcional, configuración ni datos.
+- Se propuso un monolito modular en capas dentro de `services/support-api`, conservando rutas y stack existentes y distinguiendo estado actual de diseño objetivo.
+- Se documentaron investigación oficial de FastAPI, estructura, routers, separación Next.js/API, variables de entorno, CORS, riesgos y matriz de cumplimiento.
+- Se identificaron como pendientes de negocio la discrepancia de volumen del CSV y la falta de timestamps para calcular SLA; no se inventaron datos ni requisitos.
+- Validación documental aprobada: nueve secciones, cuatro enlaces locales existentes, siete criterios de contenido comprobados, ocho riesgos y ausencia de patrones reconocibles de credenciales. Fuentes oficiales contrastadas y diagnósticos del editor sin errores.
+- Verificación pre-commit (2026-10-10): se normalizaron los espacios finales y se validó la versión en disco del documento con Node; estructura, enlaces, cobertura, bloques Markdown, whitespace y patrones de secretos aprobados. No se ejecutaron suites funcionales porque solo cambió documentación.
+- El desarrollador autorizó el commit y la publicación de `feature/arq-proposal` en `origin`; el alcance se limita a la propuesta y esta bitácora, sin cambios de arquitectura implementados ni archivos sensibles.
+
 ## Estado inicial del proyecto
 
 - Monorepo en estado plantilla base.
