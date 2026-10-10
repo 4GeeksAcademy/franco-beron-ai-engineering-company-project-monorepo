@@ -1,0 +1,64 @@
+services:
+  interfaces:
+    build:
+      context: ./uis
+      dockerfile: Dockerfile
+    command: sh /app/start.sh
+    environment:
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL}
+      WATCHPACK_POLLING: ${WATCHPACK_POLLING}
+    ports:
+      - "${WEBSITE_PORT}:3000"
+      - "${BACKOFFICE_PORT}:3001"
+    volumes:
+      - ./uis:/app
+      - website_node_modules:/app/website/node_modules
+      - website_next:/app/website/.next
+      - backoffice_node_modules:/app/backoffice/node_modules
+      - backoffice_next:/app/backoffice/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nexova
+
+  backend:
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    working_dir: /app/support-api
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES}
+      FRONTEND_URL: ${FRONTEND_URL}
+      BACKOFFICE_ORIGIN: ${BACKOFFICE_ORIGIN}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+    ports:
+      - "${BACKEND_PORT}:8001"
+    volumes:
+      - ./services:/app
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://backend:8001/health')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - nexova
+
+volumes:
+  website_node_modules:
+  website_next:
+  backoffice_node_modules:
+  backoffice_next:
+
+networks:
+  nexova:
+    name: nexova-dev-network

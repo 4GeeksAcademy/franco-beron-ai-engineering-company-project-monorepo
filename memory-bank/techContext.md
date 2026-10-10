@@ -13,8 +13,9 @@
 ## Frameworks y stack actualmente utilizados
 
 - Contexto/automatización: Markdown + estructura de carpetas por dominio.
-- Frontend (en esta iteración): aplicaciones estáticas HTML/CSS/JS en `uis/website` y `uis/backoffice`.
+- Frontend: aplicaciones Next.js en `uis/website` y `uis/backoffice` que conservan los módulos HTML/CSS/JS existentes.
 - Backend: `services/support-api`, API FastAPI con TinyDB para autenticación interna y gestión de tickets.
+- Contenedores: Docker Compose con un contenedor `interfaces` para ambas UIs y un contenedor `backend` para FastAPI.
 - Lenguajes detectados en el repo:
   - TypeScript (tipos compartidos)
   - Python (skills/scripts de ejemplo)
@@ -58,21 +59,26 @@ Como no hay runner global en raíz, los comandos se ejecutan por proyecto o medi
   - `uvicorn app.main:app --reload --port 8001`
 - Pruebas backend:
   - `cd services/support-api && python -m unittest discover -s tests`
-- Levantar website estático:
-  - `cd uis/website && python3 -m http.server 4173`
-- Levantar backoffice estático:
-  - `cd uis/backoffice && python3 -m http.server 4174`
-- Validación de ruta `/`:
-  - `curl -I http://127.0.0.1:4173/`
-  - `curl -I http://127.0.0.1:4174/`
+- Plataforma completa:
+  - `cp .env.example .env` (solo en la preparación inicial; definir un `JWT_SECRET` local)
+  - `docker compose up --build`
+  - Website: `http://localhost:3000`
+  - Backoffice: `http://localhost:3001`
+  - API: `http://localhost:8001`
+- Validación de Compose:
+  - `docker compose config --quiet`
+  - `docker compose ps`
 
 ## Decisiones técnicas vigentes de esta iteración
 
-- Se implementan UIs sin framework adicional para no imponer un stack no definido por el template.
+- Las UIs usan wrappers Next.js mínimos para cumplir la ejecución requerida con `next dev` sin reescribir la lógica existente.
+- `uis/start.sh` inicia website y backoffice en los puertos 3000 y 3001 dentro de un único contenedor Node Alpine.
+- El backoffice consume `/backend/*`; Next reenvía las solicitudes a `http://backend:8001` mediante la red `nexova-dev-network`.
+- FastAPI se ejecuta con Uvicorn `--reload` en una imagen Python slim cuyas dependencias se instalan con `uv`.
 - Se reutiliza el patrón FastAPI + bcrypt + JWT del proyecto de referencia, adaptado al dominio Nexova.
 - Las cuentas se provisionan con un script local; no existe endpoint de registro.
 - El cambio de contraseña requiere la clave actual; la recuperación usa tokens de un solo uso y Resend. `RESEND_API_KEY` solo se configura en `.env` local.
 - TinyDB persiste usuarios y tickets localmente; el correo del cliente se excluye de las respuestas públicas y la UI.
-- El backoffice sirve en `http://127.0.0.1:4174/` y la API Nexova en el puerto 8001 permite ese origen por CORS (8000 puede estar ocupado por el proyecto de referencia).
+- El backoffice sirve en `http://localhost:3001/`; en Docker usa un proxy del mismo origen hacia la API para evitar exponer nombres internos al navegador.
 - La base inicia sin históricos hasta disponer del CSV real de Nexova.
 - Se incorpora `memory-bank/` y configuración `.agents/` para continuidad operativa entre sesiones.

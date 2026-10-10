@@ -8,18 +8,31 @@ Mostrar identidad, propuesta de valor y servicios de Nexova para clientes corpor
 
 ## Stack
 
+- Next.js
+- React
 - HTML
 - CSS
 - JavaScript (modulos ES)
 
-## Ejecutar local
+## Ejecutar con Docker
+
+Desde la raiz del repositorio:
+
+```bash
+docker compose up
+```
+
+Abrir `http://localhost:3000/`.
+
+## Ejecutar sin Docker
 
 ```bash
 cd uis/website
-python3 -m http.server 4173
+npm install
+npm run dev -- --port 3000
 ```
 
-Abrir `http://127.0.0.1:4173/`.
+La pagina Next conserva los componentes, estilos y modulos ES existentes.
 
 ## Alcance actual
 

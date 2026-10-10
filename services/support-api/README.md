@@ -11,7 +11,18 @@ API privada para el backoffice de soporte. Sigue el patrón de autenticación de
 - `customer_email` se valida y persiste, pero se excluye de las respuestas y no se registra en logs.
 - No se carga un CSV de muestra: el dataset real no está presente en el repositorio.
 
-## Ejecución
+## Ejecución con Docker
+
+Desde la raiz del repositorio, crea `.env` a partir de la plantilla si todavia no existe y define un `JWT_SECRET` local largo:
+
+```bash
+cp .env.example .env
+docker compose up
+```
+
+La API queda disponible en `http://localhost:8001` con recarga en caliente. El backoffice se comunica mediante el proxy de Next y el host Docker `backend`, no mediante `localhost` dentro de la red de contenedores.
+
+## Ejecución sin Docker
 
 Desde esta carpeta:
 
@@ -19,7 +30,7 @@ Desde esta carpeta:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
+cp ../../.env.example .env
 ```
 
 Reemplaza `JWT_SECRET` en `.env` con un secreto aleatorio largo. Luego crea una cuenta interna y arranca la API:
@@ -29,8 +40,8 @@ Añade también estas variables a `.env`; usa una clave de Resend recién genera
 ```env
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_MINUTES=120
-FRONTEND_URL=http://127.0.0.1:4174
-BACKOFFICE_ORIGIN=http://127.0.0.1:4174
+FRONTEND_URL=http://127.0.0.1:3001
+BACKOFFICE_ORIGIN=http://127.0.0.1:3001
 RESEND_API_KEY=re_replace_with_your_new_resend_key
 EMAIL_FROM=Nexova Ops <onboarding@resend.dev>
 ```

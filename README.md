@@ -28,6 +28,25 @@ This repository is the **starter template** for transversal projects. You will w
 5. **Start implementing** in the right folder — do not dump everything in the root.
 6. **Document** what you add: each new app, service, agent, or pipeline gets a subfolder + README.
 
+## Containerized development
+
+Docker Compose runs the public website, internal backoffice, and support API with hot reload. The two Next.js applications share one `interfaces` container, while FastAPI runs in the `backend` container.
+
+For a new clone, create the ignored local environment file once and replace the development JWT value with a long random secret:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+After the initial setup, `docker compose up` starts the complete platform:
+
+- Website: `http://localhost:3000`
+- Backoffice: `http://localhost:3001`
+- API and Swagger: `http://localhost:8001/docs`
+
+The backoffice calls `/backend/*` on its own origin. Next.js proxies those requests to `http://backend:8001` over the explicitly named Docker network, so browser code never depends on a container-only hostname.
+
 ---
 
 ## How to think about this monorepo

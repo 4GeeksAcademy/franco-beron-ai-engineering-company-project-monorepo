@@ -1,10 +1,4 @@
-const codespacesHost = window.location.hostname.match(
-  /^(.*)-4174(\.app\.github\.dev)$/,
-);
-const defaultApiUrl = codespacesHost
-  ? `${window.location.protocol}//${codespacesHost[1]}-8001${codespacesHost[2]}`
-  : "http://127.0.0.1:8001";
-const API_URL = window.NEXOVA_API_URL ?? defaultApiUrl;
+const API_URL = "/backend";
 const TOKEN_KEY = "nexova_support_token";
 const CATEGORIES = ["TECHNICAL", "BILLING", "ACCESS", "HR_QUERY", "COMPLAINT"];
 const STATUSES = ["OPEN", "CLOSED", "DISCARDED"];

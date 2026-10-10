@@ -8,13 +8,25 @@ Entregar una vista inicial con contexto operativo relevante: SLA, tamano del equ
 
 ## Stack
 
+- Next.js
+- React
 - HTML
 - CSS
 - JavaScript (modulos ES)
 - Lucide Icons (carga fija desde CDN)
 - API central FastAPI en `services/support-api`
 
-## Ejecutar local
+## Ejecutar con Docker
+
+Desde la raiz del repositorio:
+
+```bash
+docker compose up
+```
+
+Abrir `http://localhost:3001/`. Las solicitudes a `/backend/*` se envian desde Next al servicio `backend` dentro de la red Docker.
+
+## Ejecutar sin Docker
 
 Primero inicia la API siguiendo [`services/support-api/README.md`](../../services/support-api/README.md). Crea una cuenta interna desde el backend y configura un `JWT_SECRET` local.
 
@@ -22,10 +34,10 @@ Después, desde el backoffice:
 
 ```bash
 cd uis/backoffice
-python3 -m http.server 4174
+BACKEND_INTERNAL_URL=http://127.0.0.1:8001 npm run dev -- --port 3001
 ```
 
-Abrir `http://127.0.0.1:4174/`.
+Abrir `http://127.0.0.1:3001/`.
 
 ## Acceso y tickets
 

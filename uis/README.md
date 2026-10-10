@@ -12,4 +12,14 @@ Organize `uis/` by **different concerns** — each subfolder covers a distinct a
 - **Main purpose**: to centralize in a single place all frontend applications that support the company's use cases.
 - **Recommendation**: document in this file (or in sub-READMEs) the applications you add, their objective, the technology used, and how to run them.
 
+## Docker development
+
+`uis/Dockerfile` uses Node Alpine and installs `website` and `backoffice` dependencies separately. `start.sh` runs both Next.js development servers in one container on ports 3000 and 3001. The root `docker-compose.yml` bind-mounts this directory so source changes trigger hot reload.
+
+Run the complete platform from the repository root:
+
+```bash
+docker compose up
+```
+
 > _Estas instrucciones también están disponibles en [español](./README.es.md)._
