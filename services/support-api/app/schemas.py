@@ -25,6 +25,29 @@ IncidentStatus = Literal[
     "CLOSED",
     "DISCARDED",
 ]
+CentralIncidentCategory = Literal[
+    "technical_failure",
+    "process_error",
+    "client_complaint",
+    "candidate_issue",
+    "staff_issue",
+    "sla_breach",
+    "data_quality",
+    "other",
+]
+CentralIncidentStatus = Literal[
+    "open",
+    "in_progress",
+    "resolved",
+    "discarded",
+]
+CentralIncidentOrigin = Literal["customer", "branch", "internal"]
+CentralIncidentBranch = Literal[
+    "central",
+    "valencia_operations",
+    "miami_office",
+    "remote",
+]
 
 
 class LoginRequest(BaseModel):
@@ -259,6 +282,53 @@ class IncidentSummary(BaseModel):
     by_category: dict[str, int]
     closed_scored: int
     average_satisfaction: float | None
+
+
+class CentralIncidentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1)
+    category: CentralIncidentCategory
+    status: CentralIncidentStatus
+    origin: CentralIncidentOrigin
+    branch: CentralIncidentBranch
+
+    @field_validator("title", "description")
+    @classmethod
+    def clean_required_text(cls, value: str, info) -> str:
+        clean_value = value.strip()
+        if not clean_value:
+            raise ValueError(f"{info.field_name} es obligatorio.")
+        if info.field_name == "title" and len(clean_value) > 120:
+            raise ValueError("El título admite hasta 120 caracteres.")
+        return clean_value
+
+
+class CentralIncidentStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: CentralIncidentStatus
+
+
+class CentralIncidentPublic(BaseModel):
+    id: int
+    title: str
+    description: str
+    category: CentralIncidentCategory
+    status: CentralIncidentStatus
+    origin: CentralIncidentOrigin
+    branch: CentralIncidentBranch
+    created_at: datetime
+    updated_at: datetime
+
+
+class CentralIncidentSummary(BaseModel):
+    total: int
+    by_status: dict[str, int]
+    by_category: dict[str, int]
+    by_origin: dict[str, int]
+    by_branch: dict[str, int]
 
 
 Office = Literal["Valencia", "Miami"]

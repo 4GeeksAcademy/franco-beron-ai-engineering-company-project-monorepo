@@ -40,6 +40,7 @@ from app.schemas import (
     ResetPasswordRequest,
 )
 from app.routers.inventory import router as inventory_router
+from app.routers.incidents import router as central_incidents_router
 from app.routers.profiles import router as profiles_router
 from app.routers.suppliers import router as suppliers_router
 from app.routers.users import router as users_router
@@ -66,6 +67,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Nexova Support API", lifespan=lifespan)
 app.include_router(inventory_router)
+app.include_router(central_incidents_router)
 app.include_router(suppliers_router)
 app.include_router(users_router)
 app.include_router(profiles_router)
@@ -91,18 +93,26 @@ async def request_validation_handler(
 ):
     first_error = exc.errors()[0]
     location = first_error.get("loc", [])
+    is_central_incident = request.url.path.startswith("/api/incidents")
     validation_status = (
         status.HTTP_422_UNPROCESSABLE_ENTITY
         if request.url.path == "/suppliers"
         or request.url.path.startswith("/suppliers/")
         else status.HTTP_400_BAD_REQUEST
     )
+    validation_message = first_error.get("msg", "Dato inválido")
+    if is_central_incident:
+        validation_message = (
+            f"{location[-1]} es obligatorio."
+            if first_error.get("type") == "missing" and location
+            else "El valor no es válido. Revisa el campo indicado."
+        )
     return JSONResponse(
         status_code=validation_status,
         content={
             "error": "validation_error",
             "field": str(location[-1]) if location else "unknown",
-            "message": first_error.get("msg", "Dato inválido"),
+            "message": validation_message,
         },
     )
 
@@ -329,7 +339,7 @@ def reset_password(payload: ResetPasswordRequest):
 
 
 @app.post(
-    "/api/incidents",
+    "/api/tickets",
     response_model=IncidentPublic,
     status_code=status.HTTP_201_CREATED,
 )
@@ -359,7 +369,7 @@ def create_incident(
 
 
 @app.get(
-    "/api/incidents",
+    "/api/tickets",
     response_model=list[IncidentPublic],
 )
 def list_incidents(
@@ -388,7 +398,7 @@ def list_incidents(
 
 
 @app.get(
-    "/api/incidents/summary",
+    "/api/tickets/summary",
     response_model=IncidentSummary,
 )
 def incidents_summary(current_user=Depends(get_current_user)):
@@ -417,7 +427,7 @@ def incidents_summary(current_user=Depends(get_current_user)):
 
 
 @app.get(
-    "/api/incidents/{ticket_id}",
+    "/api/tickets/{ticket_id}",
     response_model=IncidentPublic,
 )
 def get_incident(
@@ -434,7 +444,7 @@ def get_incident(
 
 
 @app.patch(
-    "/api/incidents/{ticket_id}/status",
+    "/api/tickets/{ticket_id}/status",
     response_model=IncidentPublic,
 )
 def update_incident_status(

@@ -1,5 +1,25 @@
 from datetime import date
+from pathlib import Path
 import re
+import sys
+
+
+for parent in Path(__file__).resolve().parents:
+    if (parent / "packages" / "shared" / "incident_validation.py").is_file():
+        shared_root = str(parent)
+        if shared_root not in sys.path:
+            sys.path.insert(0, shared_root)
+        break
+
+from packages.shared.incident_validation import (
+    INCIDENT_BRANCHES,
+    INCIDENT_CATEGORIES,
+    INCIDENT_ORIGINS,
+    INCIDENT_STATUSES,
+    IncidentValidationError,
+    transform_csv_row,
+    validate_incident_payload,
+)
 
 
 VALID_CATEGORIES = {

@@ -464,7 +464,7 @@ async function loadIncidents() {
 
   try {
     state.incidents = await apiRequest(
-      `/api/incidents${query ? `?${query}` : ""}`,
+      `/api/tickets${query ? `?${query}` : ""}`,
     );
   } catch (error) {
     state.listError =
@@ -482,7 +482,7 @@ async function loadSummary() {
   state.summaryError = "";
   renderSummary();
   try {
-    state.summary = await apiRequest("/api/incidents/summary");
+    state.summary = await apiRequest("/api/tickets/summary");
   } catch (error) {
     state.summaryError =
       error instanceof Error ? error.message : "No se pudo cargar el resumen.";
@@ -660,7 +660,7 @@ async function handleCreateIncident(form) {
 
   try {
     const payload = Object.fromEntries(new FormData(form).entries());
-    await apiRequest("/api/incidents", { method: "POST", body: payload });
+    await apiRequest("/api/tickets", { method: "POST", body: payload });
     form.reset();
     const dateInput = form.elements.namedItem("date");
     dateInput.value = new Date().toISOString().slice(0, 10);
@@ -712,7 +712,7 @@ async function handleStatusUpdate(form) {
 
   try {
     const updated = await apiRequest(
-      `/api/incidents/${encodeURIComponent(ticketId)}/status`,
+      `/api/tickets/${encodeURIComponent(ticketId)}/status`,
       {
         method: "PATCH",
         body: { status: newStatus, satisfaction_score: score },

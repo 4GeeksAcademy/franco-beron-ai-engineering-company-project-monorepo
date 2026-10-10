@@ -24,9 +24,9 @@ services:
 
   backend:
     build:
-      context: ./services
-      dockerfile: Dockerfile
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+      context: .
+      dockerfile: services/Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --reload-dir /app/support-api --reload-dir /app/packages/shared
     working_dir: /app/support-api
     environment:
       JWT_SECRET: ${JWT_SECRET}
@@ -40,7 +40,8 @@ services:
     ports:
       - "${BACKEND_PORT}:8001"
     volumes:
-      - ./services:/app
+      - ./services/support-api:/app/support-api
+      - ./packages/shared:/app/packages/shared
     healthcheck:
       test:
         - CMD

@@ -238,3 +238,11 @@
 - Documentación técnica actualizada en `services/support-api/README.md`, `services/README.md` y `memory-bank/techContext.md`.
 - Validaciones: smoke test aislado en TinyDB en memoria para registro/login/perfiles/CRUD/403/401/tokens inválidos y expirados/rutas protegidas; migración y cambio de contraseña legacy; suite backend existente (15 pruebas); compilación; `uv lock --check`; diagnósticos del editor y `git diff --check` aprobados.
 - Ajuste posterior solicitado: `POST /users` requiere ahora un JWT válido, por lo que todas las rutas salvo health, login y recuperación de contraseña requieren autenticación. Se validó `401` sin token y `201` con token en un smoke test aislado.
+
+## Gestor de incidencias Nexova (2026-10-10)
+
+- Se validó que el gestor ya existía en la rama y no requería un reescrito destructivo: la ruta de backend estaba implementada en `services/support-api/app/routers/incidents.py`, y la UI estaba en `uis/backoffice/pages/backoffice/incidents.js`.
+- Se corrigió el acceso desde el backoffice interno agregando la entrada `Incidencias` al sidebar del shell compartido para que la funcionalidad fuera visible y navegable.
+- Se modernizó la UI del dashboard de incidencias con layout tipo panel, badges de estado, resumen por métricas, filtros y tarjetas de seguimiento, manteniendo la lógica de negocio original intacta.
+- Validaciones realizadas: `uv run python -m unittest discover -s tests` (15 pruebas OK), `uv run python -m compileall -q app scripts` (OK), `npx next build` en `uis/backoffice` (compile OK), y smoke test real de flujo JWT + POST/GET `/api/incidents` (login, `/auth/me`, creación de incidencia y resumen OK).
+- Estado final: el requisito del gestor de incidencias queda cubierto por la implementación actual, la navegación accesible y la UI mejorada; no faltan puntos funcionales relevantes frente a la documentación del proyecto.

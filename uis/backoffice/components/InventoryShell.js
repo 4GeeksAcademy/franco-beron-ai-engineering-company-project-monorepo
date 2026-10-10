@@ -9,6 +9,12 @@ const TOKEN_KEY = "nexova_support_token";
 
 const navigation = [
   {
+    href: "/backoffice/incidents",
+    label: "Incidencias",
+    icon: "alert-triangle",
+    id: "incidents",
+  },
+  {
     href: "/backoffice/suppliers",
     label: "Proveedores",
     icon: "building-2",
