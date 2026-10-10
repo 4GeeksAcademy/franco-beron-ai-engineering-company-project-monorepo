@@ -19,6 +19,18 @@ from packages.shared.incident_validation import (
 from tinydb import Query, TinyDB
 
 
+def load_csv_rows(csv_file: Path):
+    try:
+        with csv_file.open(encoding="utf-8-sig", newline="") as source:
+            return list(csv.DictReader(source))
+    except FileNotFoundError:
+        print(f"Error: file not found: {csv_file}", file=sys.stderr)
+        raise SystemExit(1) from None
+    except (OSError, csv.Error) as exc:
+        print(f"Error: unreadable CSV file '{csv_file}': {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+
 def seed_rows(rows, incidents, import_keys) -> dict:
     counters = Counter()
     import_query = Query()
@@ -75,16 +87,20 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.csv_file.is_file():
-        parser.error("no se encuentra el fichero CSV indicado")
+        print(f"Error: file not found: {args.csv_file}", file=sys.stderr)
+        return 1
 
-    with args.csv_file.open(encoding="utf-8-sig", newline="") as source:
-        rows = csv.DictReader(source)
-        with TinyDB(args.database) as database:
-            result = seed_rows(
-                rows,
-                database.table("central_incidents"),
-                database.table("incident_seed_keys"),
-            )
+    try:
+        rows = load_csv_rows(args.csv_file)
+    except SystemExit as exc:
+        return int(exc.code) if exc.code is not None else 1
+
+    with TinyDB(args.database) as database:
+        result = seed_rows(
+            rows,
+            database.table("central_incidents"),
+            database.table("incident_seed_keys"),
+        )
 
     print(
         "Importación terminada: "

@@ -246,3 +246,12 @@
 - Se modernizó la UI del dashboard de incidencias con layout tipo panel, badges de estado, resumen por métricas, filtros y tarjetas de seguimiento, manteniendo la lógica de negocio original intacta.
 - Validaciones realizadas: `uv run python -m unittest discover -s tests` (15 pruebas OK), `uv run python -m compileall -q app scripts` (OK), `npx next build` en `uis/backoffice` (compile OK), y smoke test real de flujo JWT + POST/GET `/api/incidents` (login, `/auth/me`, creación de incidencia y resumen OK).
 - Estado final: el requisito del gestor de incidencias queda cubierto por la implementación actual, la navegación accesible y la UI mejorada; no faltan puntos funcionales relevantes frente a la documentación del proyecto.
+
+## Auditoría de error handling (2026-10-10)
+
+- Se creó la rama `feature/error-handling` desde `feature/gestor-incidencias` para aislar la auditoría de resiliencia sin mezclar trabajo funcional nuevo.
+- Se revisó la referencia externa de la auditoría y se aplicaron los patrones requeridos: manejo de errores a nivel de operación, mensajes legibles para usuario y salidas seguras en scripts.
+- Se reforzó el manejo general de excepciones en `services/support-api/app/main.py` con registro de errores en backend y respuesta JSON sin revelar trazas, rutas internas ni secretos.
+- Se añadió una ruta defensiva en `scripts/seed_incidents.py` con `load_csv_rows()` para capturar archivos no existentes o CSV corruptos y devolver `exit code 1` con mensajes a `stderr`.
+- Se actualizó `skills/data-analysis/scripts/pandas_clean.py` para abortar con `SystemExit(1)` en ficheros faltantes o datos inválidos y evitar impresiones de datasets completos que puedan filtrar contenido sensible.
+- Validaciones: `uv run python -m unittest discover -s tests` en `services/support-api` (16 pruebas OK), `python scripts/seed_incidents.py /tmp/does-not-exist.csv` devuelve `exit=1` con mensaje amigable en `stderr`, y `npx next build` en `uis/backoffice` compila correctamente.

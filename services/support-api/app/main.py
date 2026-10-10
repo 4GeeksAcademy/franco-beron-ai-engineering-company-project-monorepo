@@ -122,6 +122,7 @@ async def unexpected_error_handler(
     request: Request,
     exc: Exception,
 ):
+    logger.exception("Unhandled API error for %s", request.url.path)
     return JSONResponse(
         status_code=500,
         content={
