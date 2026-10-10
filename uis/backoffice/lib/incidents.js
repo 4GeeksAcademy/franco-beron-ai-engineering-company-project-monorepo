@@ -1,3 +1,5 @@
+import { readApiResponse } from "./api-errors.js";
+
 const TOKEN_KEY = "nexova_support_token";
 const API_BASE = (
   process.env.NEXT_PUBLIC_INVENTORY_API_URL || "/backend"
@@ -52,6 +54,7 @@ async function request(path, { method = "GET", body } = {}) {
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
+      signal: AbortSignal.timeout(15000),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -71,7 +74,26 @@ async function request(path, { method = "GET", body } = {}) {
       typeof detail?.field === "string" ? detail.field : "",
     );
   }
-  return payload;
+  try {
+    if (payload === null)
+      throw new Error(
+        "El servicio devolvió una respuesta inválida. Inténtalo de nuevo.",
+      );
+    if (
+      method === "GET" &&
+      path.split("?")[0] === "/api/incidents" &&
+      !Array.isArray(payload)
+    ) {
+      throw new Error("No se pudo cargar el listado. Inténtalo de nuevo.");
+    }
+    return await readApiResponse({
+      ok: true,
+      status: response.status,
+      json: async () => payload,
+    });
+  } catch (error) {
+    throw new IncidentApiError(error.message, response.status);
+  }
 }
 
 export function getIncidents(filters = {}) {

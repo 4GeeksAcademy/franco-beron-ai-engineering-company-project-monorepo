@@ -1,6 +1,7 @@
 import argparse
 import csv
 import hashlib
+import json
 from collections import Counter
 from pathlib import Path
 import sys
@@ -22,13 +23,21 @@ from tinydb import Query, TinyDB
 def load_csv_rows(csv_file: Path):
     try:
         with csv_file.open(encoding="utf-8-sig", newline="") as source:
-            return list(csv.DictReader(source))
+            reader = csv.DictReader(source, strict=True)
+            required = {"date", "client_company", "category", "description", "agent_id", "status", "customer_email"}
+            headers = reader.fieldnames or []
+            if not required.issubset(headers) or len(headers) != len(set(headers)):
+                raise csv.Error()
+            rows = list(reader)
+            if any(None in row or any(value is None for value in row.values()) for row in rows):
+                raise csv.Error()
+            return rows
     except FileNotFoundError:
         print(f"Error: file not found: {csv_file}", file=sys.stderr)
         raise SystemExit(1) from None
-    except (OSError, csv.Error) as exc:
-        print(f"Error: unreadable CSV file '{csv_file}': {exc}", file=sys.stderr)
-        raise SystemExit(1) from exc
+    except (OSError, UnicodeError, csv.Error):
+        print("Error: no se pudo leer el CSV. Revisa permisos, codificación UTF-8, encabezados y filas.", file=sys.stderr)
+        raise SystemExit(1) from None
 
 
 def seed_rows(rows, incidents, import_keys) -> dict:
@@ -45,7 +54,8 @@ def seed_rows(rows, incidents, import_keys) -> dict:
                 counters[f"invalid:{field}"] += 1
             print(
                 f"Fila {row_number}: registro descartado; revisar campos "
-                f"{error.field}."
+                f"{error.field}.",
+                file=sys.stderr,
             )
             continue
 
@@ -95,12 +105,16 @@ def main() -> int:
     except SystemExit as exc:
         return int(exc.code) if exc.code is not None else 1
 
-    with TinyDB(args.database) as database:
-        result = seed_rows(
-            rows,
-            database.table("central_incidents"),
-            database.table("incident_seed_keys"),
-        )
+    try:
+        with TinyDB(args.database) as database:
+            result = seed_rows(
+                rows,
+                database.table("central_incidents"),
+                database.table("incident_seed_keys"),
+            )
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        print("Error: no se pudo completar la importación. Revisa la base de destino antes de reintentar; puede haber filas ya importadas.", file=sys.stderr)
+        return 1
 
     print(
         "Importación terminada: "

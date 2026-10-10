@@ -84,7 +84,7 @@ function SummaryGroup({ title, values, labels }) {
     <section className="incident-summary-group">
       <h3>{title}</h3>
       <ul>
-        {Object.entries(values).map(([value, count]) => (
+        {Object.entries(values ?? {}).map(([value, count]) => (
           <li key={value}>
             <span>{humanize(value, labels)}</span>
             <strong>{count}</strong>
@@ -233,7 +233,7 @@ export default function IncidentsPage() {
             {summaryState === "ready" && (
               <div className="incident-total">
                 <span>Total registrado</span>
-                <strong>{summary.total}</strong>
+                <strong>{summary?.total ?? 0}</strong>
               </div>
             )}
           </div>
@@ -263,7 +263,7 @@ export default function IncidentsPage() {
                 <SummaryGroup
                   key={key}
                   title={title}
-                  values={summary[key]}
+                  values={summary?.[key] ?? {}}
                   labels={labels}
                 />
               ))}

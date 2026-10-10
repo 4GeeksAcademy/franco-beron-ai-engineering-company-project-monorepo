@@ -17,8 +17,7 @@ def send_password_reset_email(to_email: str, token: str) -> None:
     )
     safe_reset_url = escape(reset_url, quote=True)
 
-    resend.Emails.send(
-        {
+    message = {
             "from": EMAIL_FROM,
             "to": [to_email],
             "subject": "Restablecer contraseña de Nexova Ops",
@@ -30,4 +29,7 @@ def send_password_reset_email(to_email: str, token: str) -> None:
                 <p>Si no solicitaste el cambio, ignora este correo.</p>
             """,
         }
-    )
+    try:
+        resend.Emails.send(message)
+    except Exception:
+        raise RuntimeError("No se pudo entregar el correo de recuperación. Inténtalo más tarde.") from None

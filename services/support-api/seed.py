@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 
 from tinydb import Query, TinyDB
 
@@ -191,7 +192,11 @@ def seed_suppliers(table=None) -> int:
 
 
 def main() -> None:
-    inserted = seed_suppliers()
+    try:
+        inserted = seed_suppliers()
+    except (OSError, ValueError, TypeError):
+        print("Error: no se pudieron cargar los proveedores. Revisa la base local antes de reintentar.", file=sys.stderr)
+        raise SystemExit(1) from None
     print(
         f"Seeder de proveedores: {inserted} insertados, "
         f"{len(SUPPLIERS_SEED) - inserted} ya existentes."

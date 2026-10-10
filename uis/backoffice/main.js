@@ -124,27 +124,47 @@ async function apiRequest(path, options = {}) {
   if (options.body) headers["Content-Type"] = "application/json";
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch {
+    throw new Error(
+      "No se pudo conectar con el servicio. Comprueba tu conexión e inténtalo de nuevo.",
+    );
+  }
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
     if (response.status === 401 && path !== "/auth/login") {
       clearSession("La sesión terminó. Inicia sesión nuevamente.");
     }
-    const detail = data?.detail ?? data;
     const message =
-      typeof detail === "string"
-        ? detail
-        : (detail?.message ??
-          detail?.detail ??
-          "No se pudo completar la solicitud.");
+      response.status === 401
+        ? path === "/auth/login"
+          ? "Correo o contraseña incorrectos. Revisa tus credenciales e inténtalo de nuevo."
+          : "La sesión terminó. Inicia sesión nuevamente."
+        : response.status === 400 || response.status === 422
+          ? "Revisa los datos indicados e inténtalo de nuevo."
+          : "No se pudo completar la solicitud. Inténtalo de nuevo en unos momentos.";
     throw new Error(message);
   }
 
+  if (
+    data === null ||
+    typeof data !== "object" ||
+    (path.split("?")[0] === "/api/tickets" &&
+      !options.body &&
+      !Array.isArray(data))
+  ) {
+    throw new Error(
+      "El servicio devolvió una respuesta inválida. Inténtalo de nuevo.",
+    );
+  }
   return data;
 }
 
@@ -339,19 +359,19 @@ function renderSummary() {
     `;
     return;
   }
-  if (!state.summary) {
+  if (state.summaryLoading || !state.summary) {
     section.innerHTML = `<div class="loading-state">${icon("loader-circle", state.summaryLoading ? "spin" : "")}<span>${state.summaryLoading ? "Cargando resumen..." : "Sin datos."}</span></div>`;
     renderIcons();
     return;
   }
 
-  const statusItems = Object.entries(state.summary.by_status)
+  const statusItems = Object.entries(state.summary?.by_status ?? {})
     .map(
       ([key, value]) =>
         `<li><span>${escapeHTML(STATUS_LABELS[key] ?? key)}</span><span class="breakdown-track"><span style="--value:${state.summary.total ? (value / state.summary.total) * 100 : 0}%"></span></span><strong>${value}</strong></li>`,
     )
     .join("");
-  const categoryItems = Object.entries(state.summary.by_category)
+  const categoryItems = Object.entries(state.summary?.by_category ?? {})
     .map(
       ([key, value]) =>
         `<li><span>${escapeHTML(key)}</span><span class="breakdown-track"><span style="--value:${state.summary.total ? (value / state.summary.total) * 100 : 0}%"></span></span><strong>${value}</strong></li>`,

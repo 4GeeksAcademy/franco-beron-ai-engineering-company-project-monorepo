@@ -1,3 +1,4 @@
+from app.error_handling import operation_errors
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 import logging
@@ -100,7 +101,7 @@ async def request_validation_handler(
         or request.url.path.startswith("/suppliers/")
         else status.HTTP_400_BAD_REQUEST
     )
-    validation_message = first_error.get("msg", "Dato inválido")
+    validation_message = "El valor no es válido. Revisa el campo indicado."
     if is_central_incident:
         validation_message = (
             f"{location[-1]} es obligatorio."
@@ -122,7 +123,7 @@ async def unexpected_error_handler(
     request: Request,
     exc: Exception,
 ):
-    logger.exception("Unhandled API error for %s", request.url.path)
+    logger.error("unhandled_api_error type=%s", type(exc).__name__)
     return JSONResponse(
         status_code=500,
         content={
@@ -176,37 +177,39 @@ def health():
 
 @app.post("/auth/login", response_model=LoginResponse)
 def login(payload: LoginRequest):
-    user = get_user_by_email(str(payload.email))
+    with operation_errors():
+        user = get_user_by_email(str(payload.email))
 
-    if not user or not verify_password(
-        payload.password,
-        password_hash_for(user),
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email o contraseña incorrectos.",
-        )
-    if not user.get("is_active", True):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email o contraseña incorrectos.",
-        )
+        if not user or not verify_password(
+            payload.password,
+            password_hash_for(user),
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email o contraseña incorrectos.",
+            )
+        if not user.get("is_active", True):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email o contraseña incorrectos.",
+            )
 
-    return {
-        "access_token": create_access_token(user.doc_id),
-        "token_type": "bearer",
-        "user": public_user(user),
-    }
+        return {
+            "access_token": create_access_token(user.doc_id),
+            "token_type": "bearer",
+            "user": public_user(user),
+        }
 
 
 @app.get("/auth/me", response_model=AuthMeResponse)
 def me(current_user=Depends(get_current_user)):
-    return {
-        "id": current_user.doc_id,
-        "email": current_user["email"],
-        "role": current_user.get("role", "user"),
-        "profile": public_profile(ensure_profile(current_user.doc_id)),
-    }
+    with operation_errors():
+        return {
+            "id": current_user.doc_id,
+            "email": current_user["email"],
+            "role": current_user.get("role", "user"),
+            "profile": public_profile(ensure_profile(current_user.doc_id)),
+        }
 
 
 @app.post("/auth/change-password", response_model=MessageResponse)
@@ -214,129 +217,132 @@ def change_password(
     payload: ChangePasswordRequest,
     current_user=Depends(get_current_user),
 ):
-    if not verify_password(
-        payload.current_password,
-        password_hash_for(current_user),
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La contraseña actual es incorrecta.",
-        )
+    with operation_errors():
+        if not verify_password(
+            payload.current_password,
+            password_hash_for(current_user),
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña actual es incorrecta.",
+            )
 
-    update_password_hash(current_user, payload.new_password)
-    outstanding_tokens = reset_tokens.search(
-        (ResetQuery.user_id == current_user.doc_id)
-        & (ResetQuery.used == False)
-    )
-    for reset_token in outstanding_tokens:
-        reset_tokens.update(
-            {"used": True},
-            doc_ids=[reset_token.doc_id],
+        update_password_hash(current_user, payload.new_password)
+        outstanding_tokens = reset_tokens.search(
+            (ResetQuery.user_id == current_user.doc_id)
+            & (ResetQuery.used == False)
         )
+        for reset_token in outstanding_tokens:
+            reset_tokens.update(
+                {"used": True},
+                doc_ids=[reset_token.doc_id],
+            )
 
-    return {"message": "La contraseña se actualizó correctamente."}
+        return {"message": "La contraseña se actualizó correctamente."}
 
 
 @app.post("/auth/forgot-password", response_model=MessageResponse)
 def forgot_password(payload: ForgotPasswordRequest):
-    generic_message = (
-        "Si la cuenta está registrada, recibirá un enlace para restablecer la contraseña."
-    )
-    matches = users.search(
-        UserQuery.email == str(payload.email).lower()
-    )
-    if not matches:
+    with operation_errors():
+        generic_message = (
+            "Si la cuenta está registrada, recibirá un enlace para restablecer la contraseña."
+        )
+        matches = users.search(
+            UserQuery.email == str(payload.email).lower()
+        )
+        if not matches:
+            return {"message": generic_message}
+
+        user = matches[0]
+        now = datetime.now(timezone.utc)
+        previous_tokens = reset_tokens.search(
+            (ResetQuery.user_id == user.doc_id)
+            & (ResetQuery.used == False)
+        )
+        for previous_token in previous_tokens:
+            reset_tokens.update(
+                {"used": True},
+                doc_ids=[previous_token.doc_id],
+            )
+
+        raw_token = create_reset_token()
+        reset_token_id = reset_tokens.insert(
+            {
+                "user_id": user.doc_id,
+                "token_hash": hash_reset_token(raw_token),
+                "expires_at": (now + timedelta(minutes=30)).isoformat(),
+                "used": False,
+            }
+        )
+
+        try:
+            send_password_reset_email(
+                to_email=user["email"],
+                token=raw_token,
+            )
+        except Exception:
+            reset_tokens.update(
+                {"used": True},
+                doc_ids=[reset_token_id],
+            )
+            logger.warning("No se pudo entregar un correo de recuperación.")
+
         return {"message": generic_message}
-
-    user = matches[0]
-    now = datetime.now(timezone.utc)
-    previous_tokens = reset_tokens.search(
-        (ResetQuery.user_id == user.doc_id)
-        & (ResetQuery.used == False)
-    )
-    for previous_token in previous_tokens:
-        reset_tokens.update(
-            {"used": True},
-            doc_ids=[previous_token.doc_id],
-        )
-
-    raw_token = create_reset_token()
-    reset_token_id = reset_tokens.insert(
-        {
-            "user_id": user.doc_id,
-            "token_hash": hash_reset_token(raw_token),
-            "expires_at": (now + timedelta(minutes=30)).isoformat(),
-            "used": False,
-        }
-    )
-
-    try:
-        send_password_reset_email(
-            to_email=user["email"],
-            token=raw_token,
-        )
-    except Exception:
-        reset_tokens.update(
-            {"used": True},
-            doc_ids=[reset_token_id],
-        )
-        logger.warning("No se pudo entregar un correo de recuperación.")
-
-    return {"message": generic_message}
 
 
 @app.post("/auth/reset-password", response_model=MessageResponse)
 def reset_password(payload: ResetPasswordRequest):
-    token_hash = hash_reset_token(payload.token)
-    matches = reset_tokens.search(
-        ResetQuery.token_hash == token_hash
-    )
-    invalid_message = "El enlace de recuperación no es válido o expiró."
-    if not matches:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=invalid_message,
+    with operation_errors():
+        token_hash = hash_reset_token(payload.token)
+        matches = reset_tokens.search(
+            ResetQuery.token_hash == token_hash
         )
+        invalid_message = "El enlace de recuperación no es válido o expiró."
+        if not matches:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=invalid_message,
+            )
 
-    reset_token = matches[0]
-    if reset_token.get("used") is True:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=invalid_message,
-        )
+        reset_token = matches[0]
+        if reset_token.get("used") is True:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=invalid_message,
+            )
 
-    expires_at = datetime.fromisoformat(reset_token["expires_at"])
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at <= datetime.now(timezone.utc):
-        reset_tokens.update(
-            {"used": True},
-            doc_ids=[reset_token.doc_id],
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=invalid_message,
-        )
+        expires_at = datetime.fromisoformat(reset_token["expires_at"])
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= datetime.now(timezone.utc):
+            reset_tokens.update(
+                {"used": True},
+                doc_ids=[reset_token.doc_id],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=invalid_message,
+            )
 
-    user = users.get(doc_id=reset_token["user_id"])
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=invalid_message,
-        )
+        user = users.get(doc_id=reset_token["user_id"])
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=invalid_message,
+            )
 
-    update_password_hash(user, payload.new_password)
-    outstanding_tokens = reset_tokens.search(
-        (ResetQuery.user_id == user.doc_id)
-        & (ResetQuery.used == False)
-    )
-    for outstanding_token in outstanding_tokens:
-        reset_tokens.update(
-            {"used": True},
-            doc_ids=[outstanding_token.doc_id],
+        update_password_hash(user, payload.new_password)
+        outstanding_tokens = reset_tokens.search(
+            (ResetQuery.user_id == user.doc_id)
+            & (ResetQuery.used == False)
         )
+        for outstanding_token in outstanding_tokens:
+            reset_tokens.update(
+                {"used": True},
+                doc_ids=[outstanding_token.doc_id],
+            )
 
-    return {"message": "La contraseña se actualizó correctamente."}
+        return {"message": "La contraseña se actualizó correctamente."}
 
 
 @app.post(
@@ -348,25 +354,26 @@ def create_incident(
     payload: IncidentCreate,
     current_user=Depends(get_current_user),
 ):
-    clean_data = validate_incident_data(
-        payload.model_dump(),
-    )
-    now = datetime.now(timezone.utc).isoformat()
-    ticket_id = generate_ticket_id(
-        [item["ticket_id"] for item in incidents.all()]
-    )
-    incident_id = incidents.insert(
-        {
-            **clean_data,
-            "ticket_id": ticket_id,
-            "customer_email": str(payload.customer_email).lower(),
-            "reported_by_user_id": current_user.doc_id,
-            "created_at": now,
-            "updated_at": now,
-        }
-    )
-    created = incidents.get(doc_id=incident_id)
-    return public_incident(created)
+    with operation_errors():
+        clean_data = validate_incident_data(
+            payload.model_dump(),
+        )
+        now = datetime.now(timezone.utc).isoformat()
+        ticket_id = generate_ticket_id(
+            [item["ticket_id"] for item in incidents.all()]
+        )
+        incident_id = incidents.insert(
+            {
+                **clean_data,
+                "ticket_id": ticket_id,
+                "customer_email": str(payload.customer_email).lower(),
+                "reported_by_user_id": current_user.doc_id,
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
+        created = incidents.get(doc_id=incident_id)
+        return public_incident(created)
 
 
 @app.get(
@@ -378,24 +385,25 @@ def list_incidents(
     category: str | None = None,
     current_user=Depends(get_current_user),
 ):
-    if status_filter is not None and status_filter not in VALID_STATUSES:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "validation_error", "field": "status", "message": "status no es válido"},
-        )
-    if category is not None and category not in VALID_CATEGORIES:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "validation_error", "field": "category", "message": "category no es válida"},
-        )
+    with operation_errors():
+        if status_filter is not None and status_filter not in VALID_STATUSES:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "validation_error", "field": "status", "message": "status no es válido"},
+            )
+        if category is not None and category not in VALID_CATEGORIES:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "validation_error", "field": "category", "message": "category no es válida"},
+            )
 
-    records = incidents.all()
-    if status_filter:
-        records = [item for item in records if item["status"] == status_filter]
-    if category:
-        records = [item for item in records if item["category"] == category]
+        records = incidents.all()
+        if status_filter:
+            records = [item for item in records if item["status"] == status_filter]
+        if category:
+            records = [item for item in records if item["category"] == category]
 
-    return [public_incident(item) for item in records]
+        return [public_incident(item) for item in records]
 
 
 @app.get(
@@ -403,28 +411,29 @@ def list_incidents(
     response_model=IncidentSummary,
 )
 def incidents_summary(current_user=Depends(get_current_user)):
-    records = incidents.all()
-    by_status = {key: 0 for key in VALID_STATUSES}
-    by_category = {key: 0 for key in VALID_CATEGORIES}
-    closed_scores = []
+    with operation_errors():
+        records = incidents.all()
+        by_status = {key: 0 for key in VALID_STATUSES}
+        by_category = {key: 0 for key in VALID_CATEGORIES}
+        closed_scores = []
 
-    for item in records:
-        by_status[item["status"]] += 1
-        by_category[item["category"]] += 1
-        if item["status"] == "CLOSED" and item.get("satisfaction_score") is not None:
-            closed_scores.append(item["satisfaction_score"])
+        for item in records:
+            by_status[item["status"]] += 1
+            by_category[item["category"]] += 1
+            if item["status"] == "CLOSED" and item.get("satisfaction_score") is not None:
+                closed_scores.append(item["satisfaction_score"])
 
-    return {
-        "total": len(records),
-        "by_status": by_status,
-        "by_category": by_category,
-        "closed_scored": len(closed_scores),
-        "average_satisfaction": (
-            round(sum(closed_scores) / len(closed_scores), 2)
-            if closed_scores
-            else None
-        ),
-    }
+        return {
+            "total": len(records),
+            "by_status": by_status,
+            "by_category": by_category,
+            "closed_scored": len(closed_scores),
+            "average_satisfaction": (
+                round(sum(closed_scores) / len(closed_scores), 2)
+                if closed_scores
+                else None
+            ),
+        }
 
 
 @app.get(
@@ -435,13 +444,14 @@ def get_incident(
     ticket_id: str,
     current_user=Depends(get_current_user),
 ):
-    matches = incidents.search(IncidentQuery.ticket_id == ticket_id)
-    if not matches:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "not_found", "message": "Ticket no encontrado."},
-        )
-    return public_incident(matches[0])
+    with operation_errors():
+        matches = incidents.search(IncidentQuery.ticket_id == ticket_id)
+        if not matches:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "not_found", "message": "Ticket no encontrado."},
+            )
+        return public_incident(matches[0])
 
 
 @app.patch(
@@ -453,22 +463,23 @@ def update_incident_status(
     payload: IncidentStatusUpdate,
     current_user=Depends(get_current_user),
 ):
-    matches = incidents.search(IncidentQuery.ticket_id == ticket_id)
-    if not matches:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "not_found", "message": "Ticket no encontrado."},
-        )
+    with operation_errors():
+        matches = incidents.search(IncidentQuery.ticket_id == ticket_id)
+        if not matches:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "not_found", "message": "Ticket no encontrado."},
+            )
 
-    incident = matches[0]
-    changes = {
-        "status": payload.status,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if payload.status == "CLOSED":
-        changes["satisfaction_score"] = payload.satisfaction_score
-    elif payload.satisfaction_score is not None:
-        changes["satisfaction_score"] = payload.satisfaction_score
+        incident = matches[0]
+        changes = {
+            "status": payload.status,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if payload.status == "CLOSED":
+            changes["satisfaction_score"] = payload.satisfaction_score
+        elif payload.satisfaction_score is not None:
+            changes["satisfaction_score"] = payload.satisfaction_score
 
-    incidents.update(changes, doc_ids=[incident.doc_id])
-    return public_incident(incidents.get(doc_id=incident.doc_id))
+        incidents.update(changes, doc_ids=[incident.doc_id])
+        return public_incident(incidents.get(doc_id=incident.doc_id))

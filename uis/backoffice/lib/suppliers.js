@@ -1,3 +1,5 @@
+import { apiErrorMessage, readApiResponse } from "./api-errors.js";
+
 const TOKEN_KEY = "nexova_support_token";
 const API_BASE = (
   process.env.NEXT_PUBLIC_INVENTORY_API_URL || "/backend"
@@ -19,11 +21,7 @@ function redirectToLogin() {
 }
 
 function errorMessage(payload, status) {
-  const detail = payload?.detail;
-  if (typeof detail === "string") return detail;
-  if (detail?.message) return detail.message;
-  if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
-  return payload?.message || `La API respondió con estado ${status}.`;
+  return apiErrorMessage(status);
 }
 
 async function request(path, { method = "GET", body } = {}) {
@@ -44,23 +42,29 @@ async function request(path, { method = "GET", body } = {}) {
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
+      signal: AbortSignal.timeout(15000),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new SupplierApiError(
-      "No se pudo conectar con el directorio de proveedores.",
+      "No se pudo conectar con el directorio de proveedores. Comprueba tu conexión e inténtalo de nuevo.",
       0,
     );
   }
 
-  if (response.status === 204) return null;
-  const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = errorMessage(payload, response.status);
+    const message = errorMessage(null, response.status);
     if (response.status === 401) redirectToLogin();
     throw new SupplierApiError(message, response.status);
   }
-  return payload;
+  try {
+    const payload = await readApiResponse(response);
+    if (method === "GET" && !Array.isArray(payload))
+      throw new Error("El directorio no está disponible. Inténtalo de nuevo.");
+    return payload;
+  } catch (error) {
+    throw new SupplierApiError(error.message, response.status);
+  }
 }
 
 export function getSuppliers({ country = "", category = "" } = {}) {

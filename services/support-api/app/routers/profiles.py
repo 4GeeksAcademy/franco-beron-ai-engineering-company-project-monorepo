@@ -1,3 +1,4 @@
+from app.error_handling import operation_errors
 from fastapi import APIRouter, Depends
 
 from app.auth import get_current_user
@@ -10,7 +11,8 @@ router = APIRouter(prefix="/profiles", tags=["profiles"])
 
 @router.get("/me", response_model=ProfilePublic)
 def get_my_profile(current_user=Depends(get_current_user)):
-    return public_profile(ensure_profile(current_user.doc_id))
+    with operation_errors():
+        return public_profile(ensure_profile(current_user.doc_id))
 
 
 @router.put("/me", response_model=ProfilePublic)
@@ -18,8 +20,9 @@ def put_my_profile(
     payload: ProfileUpdate,
     current_user=Depends(get_current_user),
 ):
-    profile = update_profile(
-        current_user.doc_id,
-        payload.model_dump(exclude_unset=True),
-    )
-    return public_profile(profile)
+    with operation_errors():
+        profile = update_profile(
+            current_user.doc_id,
+            payload.model_dump(exclude_unset=True),
+        )
+        return public_profile(profile)

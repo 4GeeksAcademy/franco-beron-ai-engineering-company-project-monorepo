@@ -14,8 +14,8 @@ def main() -> int:
 	except FileNotFoundError:
 		print(f"Error: file not found: {path}", file=sys.stderr)
 		return 1
-	except ValueError as exc:
-		print(f"Error: invalid data file '{path}': {exc}", file=sys.stderr)
+	except (OSError, UnicodeError, ValueError, pd.errors.ParserError):
+		print("Error: no se pudo leer el CSV. Revisa formato, permisos y codificación.", file=sys.stderr)
 		return 1
 
 	# Drop fully null columns
@@ -33,7 +33,7 @@ def main() -> int:
 	df = df.drop_duplicates()
 
 	print(
-		f"Rows loaded: {len(df)} | original rows: {before} | columns: {list(df.columns)}",
+		f"Rows loaded: {len(df)} | original rows: {before} | columns: {len(df.columns)}",
 		file=sys.stdout,
 	)
 	return 0

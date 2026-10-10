@@ -249,6 +249,17 @@
 
 ## Auditoría de error handling (2026-10-10)
 
+### Ampliación para cubrir el README completo
+
+- La primera entrega no cubría toda la auditoría: se completaron clientes frontend, acciones de reintento, campos nulos, captura local en rutas y scripts administrativos en la misma rama `feature/error-handling`.
+- Frontend: estados carga/éxito/error separados, salida de carga por transiciones o `finally`, CTA en cargas de activos y stock, mensajes HTTP saneados, timeout de fetch y rechazo de JSON inválido o listados nulos. El website no contiene fetch de datos que requiera esos estados.
+- Backend: 34 handlers conservan rutas y firmas y capturan fallos de operación; se mantienen `400/404/422`, SQL indisponible devuelve `503`, errores inesperados `500` y los fallos SQL hacen rollback. El handler global permanece como respaldo.
+- Privacidad: validación y logs no muestran texto de excepciones ni entradas. Correo saneado y timeout de 30 segundos del transporte Resend instalado; no hay llamadas LLM en este alcance.
+- Scripts: CSV estricto validado antes de escritura, fallos de UTF-8/permisos/persistencia a `stderr` y código `1`; creación de usuarios y seed de proveedores no reportan éxito ante fallos. La limpieza pandas solo imprime agregados, no filas ni encabezados.
+- Validaciones: 21 pruebas backend aprobadas, tres pruebas de clientes aprobadas (red/500/parsing/nulos/éxito), build Next aprobado y backoffice existente en puerto 3001 con HTTP 200. No se usaron credenciales ni se escribieron datos en Supabase.
+- Limitaciones: sin navegador instalado para prueba visual de carga/error/reintento; Pylance sigue indicando importación `app.config` no resuelta en el script de raíz aunque su ejecución y tests resuelven la ruta. La utilidad pandas requiere su dependencia opcional y no se ejecutó con un CSV real.
+- Cambios de esta ampliación sin commit ni push; no se modificaron `.env`, configuración Docker, esquema de base de datos ni archivos críticos.
+
 - Se creó la rama `feature/error-handling` desde `feature/gestor-incidencias` para aislar la auditoría de resiliencia sin mezclar trabajo funcional nuevo.
 - Se revisó la referencia externa de la auditoría y se aplicaron los patrones requeridos: manejo de errores a nivel de operación, mensajes legibles para usuario y salidas seguras en scripts.
 - Se reforzó el manejo general de excepciones en `services/support-api/app/main.py` con registro de errores en backend y respuesta JSON sin revelar trazas, rutas internas ni secretos.

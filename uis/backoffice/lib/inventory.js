@@ -1,3 +1,5 @@
+import { apiErrorMessage, readApiResponse } from "./api-errors.js";
+
 const TOKEN_KEY = "nexova_support_token";
 const API_BASE = (
   process.env.NEXT_PUBLIC_INVENTORY_API_URL || "/backend"
@@ -25,13 +27,7 @@ function redirectToLogin() {
 }
 
 function responseMessage(payload, status) {
-  const detail = payload?.detail;
-  if (typeof detail === "string") return detail;
-  if (detail?.message) return detail.message;
-  if (payload?.message) return payload.message;
-  if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
-  if (payload?.error) return payload.error;
-  return `La API respondió con el estado ${status}.`;
+  return apiErrorMessage(status);
 }
 
 async function request(path, { method = "GET", body, token } = {}) {
@@ -51,23 +47,36 @@ async function request(path, { method = "GET", body, token } = {}) {
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
+      signal: AbortSignal.timeout(15000),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new InventoryApiError(
-      "No se pudo conectar con el servicio de inventario.",
+      "No se pudo conectar con el servicio de inventario. Comprueba tu conexión e inténtalo de nuevo.",
       0,
     );
   }
 
-  const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = responseMessage(payload, response.status);
+    const message = responseMessage(null, response.status);
     if (response.status === 401) redirectToLogin();
     throw new InventoryApiError(message, response.status);
   }
 
-  return payload;
+  try {
+    const payload = await readApiResponse(response);
+    if (
+      ["/inventory/products", "/inventory/orders"].includes(
+        path.split("?")[0],
+      ) &&
+      !Array.isArray(payload)
+    ) {
+      throw new Error("No se pudo cargar el listado. Inténtalo de nuevo.");
+    }
+    return payload;
+  } catch (error) {
+    throw new InventoryApiError(error.message, response.status);
+  }
 }
 
 export function getCurrentUser(token) {

@@ -80,3 +80,19 @@ NEXT_PUBLIC_INVENTORY_API_URL=http://127.0.0.1:8001
 ```
 
 Ese archivo está ignorado por Git. La URL solo configura el endpoint del backend; nunca coloques tokens ni credenciales de Supabase en variables `NEXT_PUBLIC_*`.
+
+## Auditoría de errores
+
+- Los clientes de inventario, proveedores e incidencias capturan fallos de red y JSON inválido y tienen un timeout de 15 segundos. Los mensajes no muestran códigos HTTP ni texto interno del servidor.
+- Los listados, resumen, autenticación y stock separan carga, éxito y error. Las transiciones de estado en efectos equivalen a limpiar la carga; los formularios usan `finally` o reemplazan la vista al finalizar.
+- Las cargas fallidas permiten reintentar. Los formularios conservan una acción de envío y el stock permite volver a consultar sin recargar la página.
+- Los campos opcionales de resúmenes, categorías y activos usan fallbacks para no romper el renderizado ante valores nulos.
+
+Validaciones desde esta carpeta:
+
+```bash
+node --experimental-default-type=module --test lib/api-errors.test.mjs
+npx next build
+```
+
+Las pruebas de clientes simulan desconexión, HTTP 500, JSON inválido y respuestas nulas, sin acceder a datos reales. La prueba visual de los estados carga/error/reintento requiere un navegador; no queda cubierta por el build.

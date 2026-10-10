@@ -110,6 +110,16 @@ La recuperación devuelve la misma respuesta tanto si la cuenta existe como si n
 
 ## Pruebas
 
+### Manejo de errores
+
+Los handlers capturan fallos dentro de cada operación con `operation_errors`. Los errores de negocio conservan su estado HTTP; conflictos de integridad responden `400`, fallos SQL `503` y errores inesperados `500`, con JSON estructurado. Las transacciones fallidas hacen rollback.
+
+El manejador global queda como última protección. Validación y logs no incluyen entradas del usuario, tracebacks, texto de excepciones ni credenciales. Las rutas de validación conservan `400` o `422` según el contrato existente y los registros ausentes conservan `404`.
+
+Resend usa el timeout de 30 segundos del transporte instalado. El fallo de envío se sanea y la recuperación mantiene una respuesta genérica para no revelar cuentas; el token fallido se invalida.
+
+Las pruebas de errores usan almacenamiento y envío simulados, sin escribir en Supabase ni enviar correos reales. Cubren respuesta HTTP, rollback, privacidad y códigos de salida de scripts.
+
 ```bash
 python -m unittest discover -s tests
 ```
