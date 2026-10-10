@@ -191,3 +191,14 @@
 - `GET /inventory/products` devolvió seis assets con stock neto verificado: `NXV-IT-001=13`, `NXV-IT-002=0`, `NXV-PER-002=11` y `NXV-OFF-001=97`.
 - Consulta de solo lectura a `information_schema` y conteos confirmó `asset=6`, `assetentry=5`, `assetexit=3`.
 - No se guardaron credenciales en archivos rastreados ni se registraron en esta bitácora.
+
+## Backoffice de inventario (2026-10-10)
+
+- Se implementó en `feature/interfaz-visual` la sección `/backoffice/inventory` dentro del backoffice Next.js existente.
+- Se añadió `lib/inventory.js` para centralizar llamadas, enviar JWT, extraer errores HTTP y redirigir sesiones ausentes o expiradas al login conservando la ruta de retorno.
+- Se añadieron las vistas protegidas de productos, entrada, salida e historial de solo lectura; el formulario de salida consulta stock reactivo, previene cantidades excesivas y presenta el HTTP 400 junto al campo.
+- La tabla muestra asset, SKU, categoría, oficina y `current_stock`; stock bajo se define como menos de cinco unidades y agotado como cero. La navegación existente enlaza al inventario.
+- Se documentó ejecución en Docker mediante proxy `/backend` y configuración opcional `NEXT_PUBLIC_INVENTORY_API_URL`; `.env.local` está ignorado por Git.
+- Build de Next aprobado; las cuatro rutas devolvieron HTTP 200 y el proxy `/backend/health` devolvió estado `ok`.
+- El backend de inventario real está disponible y sus endpoints de lectura devolvieron los datos semilla previamente verificados.
+- No se completó prueba visual Playwright: el instalador de Chromium no soporta Ubuntu 20.04 en este entorno. No se añadieron dependencias de navegador al proyecto.

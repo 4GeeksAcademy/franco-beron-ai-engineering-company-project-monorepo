@@ -222,6 +222,7 @@ function renderDashboard() {
       <div class="brand-lockup"><span class="brand-mark">N</span><div><strong>Nexova</strong><span>Operations</span></div></div>
       <nav aria-label="Navegación principal">
         <a class="nav-link active" href="#resumen">${icon("layout-dashboard")}<span>Resumen</span></a>
+        <a class="nav-link" href="/backoffice/inventory/products">${icon("boxes")}<span>Inventario</span></a>
         <a class="nav-link" href="#tickets">${icon("inbox")}<span>Tickets</span></a>
         <a class="nav-link" href="#prioridades">${icon("list-checks")}<span>Prioridades</span></a>
         <a class="nav-link" href="#privacidad">${icon("shield-check")}<span>Privacidad</span></a>
@@ -540,6 +541,15 @@ async function handleLogin(form) {
     state.token = result.access_token;
     sessionStorage.setItem(TOKEN_KEY, state.token);
     state.user = result.user;
+    const returnTo = new URLSearchParams(window.location.search).get("next");
+    if (
+      returnTo?.startsWith("/") &&
+      !returnTo.startsWith("//") &&
+      !returnTo.includes("\\")
+    ) {
+      window.location.assign(returnTo);
+      return;
+    }
     renderDashboard();
     await Promise.all([loadIncidents(), loadSummary()]);
   } catch (error) {
