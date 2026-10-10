@@ -1,5 +1,16 @@
 # Progress Log
 
+## Propuesta de arquitectura de backend (2026-10-10)
+
+- Se creó `feature/arq-proposal` desde `feature/directorio-proveedores`, con árbol de trabajo limpio al iniciar.
+- Se añadió `docs/ARCHITECTURE_PROPOSAL.md` como entregable documental de la consigna oficial; no se modificó código funcional, configuración ni datos.
+- Se propuso un monolito modular en capas dentro de `services/support-api`, conservando rutas y stack existentes y distinguiendo estado actual de diseño objetivo.
+- Se documentaron investigación oficial de FastAPI, estructura, routers, separación Next.js/API, variables de entorno, CORS, riesgos y matriz de cumplimiento.
+- Se identificaron como pendientes de negocio la discrepancia de volumen del CSV y la falta de timestamps para calcular SLA; no se inventaron datos ni requisitos.
+- Validación documental aprobada: nueve secciones, cuatro enlaces locales existentes, siete criterios de contenido comprobados, ocho riesgos y ausencia de patrones reconocibles de credenciales. Fuentes oficiales contrastadas y diagnósticos del editor sin errores.
+- Verificación pre-commit (2026-10-10): se normalizaron los espacios finales y se validó la versión en disco del documento con Node; estructura, enlaces, cobertura, bloques Markdown, whitespace y patrones de secretos aprobados. No se ejecutaron suites funcionales porque solo cambió documentación.
+- El desarrollador autorizó el commit y la publicación de `feature/arq-proposal` en `origin`; el alcance se limita a la propuesta y esta bitácora, sin cambios de arquitectura implementados ni archivos sensibles.
+
 ## Estado inicial del proyecto
 
 - Monorepo en estado plantilla base.
@@ -191,3 +202,39 @@
 - `GET /inventory/products` devolvió seis assets con stock neto verificado: `NXV-IT-001=13`, `NXV-IT-002=0`, `NXV-PER-002=11` y `NXV-OFF-001=97`.
 - Consulta de solo lectura a `information_schema` y conteos confirmó `asset=6`, `assetentry=5`, `assetexit=3`.
 - No se guardaron credenciales en archivos rastreados ni se registraron en esta bitácora.
+
+## Backoffice de inventario (2026-10-10)
+
+- Se implementó en `feature/interfaz-visual` la sección `/backoffice/inventory` dentro del backoffice Next.js existente.
+- Se añadió `lib/inventory.js` para centralizar llamadas, enviar JWT, extraer errores HTTP y redirigir sesiones ausentes o expiradas al login conservando la ruta de retorno.
+- Se añadieron las vistas protegidas de productos, entrada, salida e historial de solo lectura; el formulario de salida consulta stock reactivo, previene cantidades excesivas y presenta el HTTP 400 junto al campo.
+- La tabla muestra asset, SKU, categoría, oficina y `current_stock`; stock bajo se define como menos de cinco unidades y agotado como cero. La navegación existente enlaza al inventario.
+- Se documentó ejecución en Docker mediante proxy `/backend` y configuración opcional `NEXT_PUBLIC_INVENTORY_API_URL`; `.env.local` está ignorado por Git.
+- Build de Next aprobado; las cuatro rutas devolvieron HTTP 200 y el proxy `/backend/health` devolvió estado `ok`.
+- El backend de inventario real está disponible y sus endpoints de lectura devolvieron los datos semilla previamente verificados.
+- No se completó prueba visual Playwright: el instalador de Chromium no soporta Ubuntu 20.04 en este entorno. No se añadieron dependencias de navegador al proyecto.
+
+## Directorio de proveedores Nexova (2026-10-10)
+
+- Se creó `feature/directorio-proveedores` desde `feature/interfaz-visual` para aislar este proyecto previo y preservar inventario/backoffice existentes.
+- Se añadieron schemas Pydantic `Supplier` separados por operación, validación de categorías/estado, tarifa positiva, moneda por país, email y fecha ISO. `updated_at` lo genera el servidor y se modifica al cambiar tarifa.
+- Se añadió una tabla TinyDB independiente `suppliers` y los endpoints list/create/detail/update-rate/update-status/delete con filtros por `country` y `category`, `404` para IDs ausentes y `422` para entrada inválida.
+- Se configuró `uv run seed` con los 15 registros oficiales de Nexova; primera ejecución insertó 15 y la segunda 0, sin duplicar. `db.json` sigue ignorado por Git.
+- Se añadió `/backoffice/suppliers` al menú y una tabla filtrable con alta, tarifas editables, estados diferenciados y renovaciones próximas destacadas; se reutiliza la sesión y el shell existente.
+- Pruebas HTTP contra el backend activo: 15 registros, filtros Spain/ATS, CRUD, timestamp, estados, `422` y `404`; registro de prueba eliminado al finalizar.
+- Seeder `uv run seed`: primera ejecución insertó 15 registros y la repetición insertó cero duplicados.
+- API real: listados/filtros devolvieron 15 proveedores, 8 de Spain y 2 de `ats_software`; alta/lectura, tarifa con `updated_at`, suspensión, DELETE `200`, IDs ausentes `404` e invalidaciones `422` aprobadas. Se eliminó el registro temporal de prueba.
+- Suite backend existente: 15 pruebas aprobadas; `compileall`, `uv lock --check` y `git diff --check` aprobados.
+- Build Next aprobado; `/backoffice/suppliers` y las cuatro rutas de inventario devolvieron HTTP `200`; proxy `/backend/health` respondió `ok`.
+- No se ejecutó prueba visual Playwright por la incompatibilidad de Chromium con Ubuntu 20.04 del contenedor.
+
+## Router de autenticación (2026-10-10)
+
+- Se creó la rama local `feature/auth-router` desde `feature/arq-proposal`, inicialmente limpia. El desarrollador autorizó explícitamente que `POST /users` sea público para cumplir la consigna; el backoffice sigue sin pantalla pública de registro y el script local permite provisionar administradores.
+- Se añadieron CRUD `/users`, `/profiles/me`, roles `admin`/`manager`/`user`, autorización de propietario/admin y perfiles separados en TinyDB. User/Profile no se guardan en Supabase/PostgreSQL.
+- Se adoptó `OAuth2PasswordBearer`, `python-jose` y `libpass[bcrypt]`; `ACCESS_TOKEN_EXPIRE_MINUTES` admite los nombres de configuración anteriores como alias.
+- Se protegieron todos los endpoints de proveedores e inventario y se mantuvo autenticado el CRUD de tickets. Sin token, siete rutas existentes fuera de `/users`/`/auth` responden `401`.
+- Se migran en uso cuentas legacy: `password_hash` a `hashed_password`, nombre a `profiles`; los hashes bcrypt existentes verifican con libpass. El UUID TinyDB usado por movimientos SQL sigue conservado.
+- Documentación técnica actualizada en `services/support-api/README.md`, `services/README.md` y `memory-bank/techContext.md`.
+- Validaciones: smoke test aislado en TinyDB en memoria para registro/login/perfiles/CRUD/403/401/tokens inválidos y expirados/rutas protegidas; migración y cambio de contraseña legacy; suite backend existente (15 pruebas); compilación; `uv lock --check`; diagnósticos del editor y `git diff --check` aprobados.
+- Ajuste posterior solicitado: `POST /users` requiere ahora un JWT válido, por lo que todas las rutas salvo health, login y recuperación de contraseña requieren autenticación. Se validó `401` sin token y `201` con token en un smoke test aislado.

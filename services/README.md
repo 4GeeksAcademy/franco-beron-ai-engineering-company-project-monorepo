@@ -9,7 +9,7 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 
 ## Current services
 
-- [`support-api/`](./support-api/README.md): private FastAPI API for managed internal login and Nexova support tickets. It uses bcrypt, JWT, and TinyDB; public account registration is disabled.
+- [`support-api/`](./support-api/README.md): FastAPI API for authentication, support, inventory, and the Nexova supplier directory. It uses TinyDB for users, profiles, tickets, and suppliers, plus SQLModel/Supabase for inventory.
 
 ## Docker development
 

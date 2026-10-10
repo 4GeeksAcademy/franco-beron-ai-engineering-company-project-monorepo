@@ -1,12 +1,11 @@
 from getpass import getpass
-from uuid import uuid4
-
 from pydantic import TypeAdapter, ValidationError
 from pydantic.networks import EmailStr
 from tinydb import Query
 
 from app.db import users
-from app.security import hash_password
+from app.schemas import UserRole
+from app.user_service import create_user as persist_user
 
 
 def main():
@@ -18,6 +17,13 @@ def main():
         return
 
     name = input("Nombre: ").strip()
+    role_input = input("Rol (admin/manager/user) [user]: ").strip() or "user"
+    try:
+        role = UserRole(role_input)
+    except ValueError:
+        print("Rol inválido; use admin, manager o user.")
+        return
+
     password = getpass("Contraseña (mínimo 8 caracteres): ")
     confirmation = getpass("Repetir contraseña: ")
 
@@ -33,14 +39,7 @@ def main():
         print("La cuenta ya existe.")
         return
 
-    users.insert(
-        {
-            "uuid": str(uuid4()),
-            "email": str(email).lower(),
-            "name": name,
-            "password_hash": hash_password(password),
-        }
-    )
+    persist_user(str(email), password, {"name": name}, role=role)
     print("Cuenta interna creada.")
 
 
