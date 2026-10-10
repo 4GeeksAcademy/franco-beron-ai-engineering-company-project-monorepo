@@ -227,3 +227,14 @@
 - Suite backend existente: 15 pruebas aprobadas; `compileall`, `uv lock --check` y `git diff --check` aprobados.
 - Build Next aprobado; `/backoffice/suppliers` y las cuatro rutas de inventario devolvieron HTTP `200`; proxy `/backend/health` respondió `ok`.
 - No se ejecutó prueba visual Playwright por la incompatibilidad de Chromium con Ubuntu 20.04 del contenedor.
+
+## Router de autenticación (2026-10-10)
+
+- Se creó la rama local `feature/auth-router` desde `feature/arq-proposal`, inicialmente limpia. El desarrollador autorizó explícitamente que `POST /users` sea público para cumplir la consigna; el backoffice sigue sin pantalla pública de registro y el script local permite provisionar administradores.
+- Se añadieron CRUD `/users`, `/profiles/me`, roles `admin`/`manager`/`user`, autorización de propietario/admin y perfiles separados en TinyDB. User/Profile no se guardan en Supabase/PostgreSQL.
+- Se adoptó `OAuth2PasswordBearer`, `python-jose` y `libpass[bcrypt]`; `ACCESS_TOKEN_EXPIRE_MINUTES` admite los nombres de configuración anteriores como alias.
+- Se protegieron todos los endpoints de proveedores e inventario y se mantuvo autenticado el CRUD de tickets. Sin token, siete rutas existentes fuera de `/users`/`/auth` responden `401`.
+- Se migran en uso cuentas legacy: `password_hash` a `hashed_password`, nombre a `profiles`; los hashes bcrypt existentes verifican con libpass. El UUID TinyDB usado por movimientos SQL sigue conservado.
+- Documentación técnica actualizada en `services/support-api/README.md`, `services/README.md` y `memory-bank/techContext.md`.
+- Validaciones: smoke test aislado en TinyDB en memoria para registro/login/perfiles/CRUD/403/401/tokens inválidos y expirados/rutas protegidas; migración y cambio de contraseña legacy; suite backend existente (15 pruebas); compilación; `uv lock --check`; diagnósticos del editor y `git diff --check` aprobados.
+- Ajuste posterior solicitado: `POST /users` requiere ahora un JWT válido, por lo que todas las rutas salvo health, login y recuperación de contraseña requieren autenticación. Se validó `401` sin token y `201` con token en un smoke test aislado.

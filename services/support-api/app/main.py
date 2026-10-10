@@ -27,6 +27,7 @@ from app.incident_rules import (
     validate_incident_data,
 )
 from app.schemas import (
+    AuthMeResponse,
     ChangePasswordRequest,
     IncidentCreate,
     IncidentPublic,
@@ -37,10 +38,17 @@ from app.schemas import (
     LoginResponse,
     MessageResponse,
     ResetPasswordRequest,
-    UserPublic,
 )
 from app.routers.inventory import router as inventory_router
+from app.routers.profiles import router as profiles_router
 from app.routers.suppliers import router as suppliers_router
+from app.routers.users import router as users_router
+from app.user_service import (
+    ensure_profile,
+    get_user_by_email,
+    normalize_user_record,
+    public_profile,
+)
 from app.security import (
     create_access_token,
     create_reset_token,
@@ -59,13 +67,15 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Nexova Support API", lifespan=lifespan)
 app.include_router(inventory_router)
 app.include_router(suppliers_router)
+app.include_router(users_router)
+app.include_router(profiles_router)
 logger = logging.getLogger(__name__)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[BACKOFFICE_ORIGIN],
     allow_origin_regex=r"https://[a-zA-Z0-9-]+-4174\.app\.github\.dev",
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -112,11 +122,23 @@ async def unexpected_error_handler(
 
 
 def public_user(user) -> dict:
+    user = normalize_user_record(user)
+    profile = ensure_profile(user.doc_id)
     return {
         "id": user.doc_id,
         "email": user["email"],
-        "name": user.get("name", ""),
+        "name": profile.get("name") or "",
+        "role": user.get("role", "user"),
     }
+
+
+def password_hash_for(user) -> str:
+    return user.get("hashed_password", user.get("password_hash", ""))
+
+
+def update_password_hash(user, password: str):
+    field = "hashed_password" if "hashed_password" in user else "password_hash"
+    users.update({field: hash_password(password)}, doc_ids=[user.doc_id])
 
 
 def public_incident(incident) -> dict:
@@ -143,15 +165,17 @@ def health():
 
 @app.post("/auth/login", response_model=LoginResponse)
 def login(payload: LoginRequest):
-    matches = users.search(
-        UserQuery.email == str(payload.email).lower()
-    )
-    user = matches[0] if matches else None
+    user = get_user_by_email(str(payload.email))
 
     if not user or not verify_password(
         payload.password,
-        user["password_hash"],
+        password_hash_for(user),
     ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email o contraseña incorrectos.",
+        )
+    if not user.get("is_active", True):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos.",
@@ -164,9 +188,14 @@ def login(payload: LoginRequest):
     }
 
 
-@app.get("/auth/me", response_model=UserPublic)
+@app.get("/auth/me", response_model=AuthMeResponse)
 def me(current_user=Depends(get_current_user)):
-    return public_user(current_user)
+    return {
+        "id": current_user.doc_id,
+        "email": current_user["email"],
+        "role": current_user.get("role", "user"),
+        "profile": public_profile(ensure_profile(current_user.doc_id)),
+    }
 
 
 @app.post("/auth/change-password", response_model=MessageResponse)
@@ -176,17 +205,14 @@ def change_password(
 ):
     if not verify_password(
         payload.current_password,
-        current_user["password_hash"],
+        password_hash_for(current_user),
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La contraseña actual es incorrecta.",
         )
 
-    users.update(
-        {"password_hash": hash_password(payload.new_password)},
-        doc_ids=[current_user.doc_id],
-    )
+    update_password_hash(current_user, payload.new_password)
     outstanding_tokens = reset_tokens.search(
         (ResetQuery.user_id == current_user.doc_id)
         & (ResetQuery.used == False)
@@ -288,10 +314,7 @@ def reset_password(payload: ResetPasswordRequest):
             detail=invalid_message,
         )
 
-    users.update(
-        {"password_hash": hash_password(payload.new_password)},
-        doc_ids=[user.doc_id],
-    )
+    update_password_hash(user, payload.new_password)
     outstanding_tokens = reset_tokens.search(
         (ResetQuery.user_id == user.doc_id)
         & (ResetQuery.used == False)

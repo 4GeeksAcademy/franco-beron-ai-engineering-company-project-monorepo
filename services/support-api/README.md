@@ -4,9 +4,10 @@ API privada para el backoffice de soporte. Sigue el patrón de autenticación de
 
 ## Alcance
 
-- Login interno con bcrypt y JWT. No existe registro público.
-- Las cuentas se crean de forma administrada con `scripts/create_user.py`.
-- Gestión de inventario con SQLModel y Supabase/PostgreSQL; TinyDB continúa almacenando usuarios y tickets.
+- Autenticación JWT con `OAuth2PasswordBearer`, `python-jose` y `libpass[bcrypt]`; el alta mediante `POST /users` requiere una sesión válida y el backoffice no incorpora una pantalla pública de registro.
+- `User` y `Profile` se guardan únicamente en TinyDB. Los roles válidos son `admin`, `manager` y `user`; el alta asigna `user` por defecto.
+- `scripts/create_user.py` continúa disponible para provisionar cuentas directamente en TinyDB, asignar un rol controlado y crear su perfil inicial.
+- Gestión de inventario con SQLModel y Supabase/PostgreSQL; TinyDB también almacena tickets y proveedores.
 - Directorio de proveedores Nexova persistido en la tabla TinyDB `suppliers`.
 - Tickets con categorías `TECHNICAL`, `BILLING`, `ACCESS`, `HR_QUERY` y `COMPLAINT`.
 - Estados `OPEN`, `CLOSED` y `DISCARDED`; un ticket `CLOSED` requiere puntuación de satisfacción entre 1 y 5.
@@ -41,7 +42,7 @@ Añade también estas variables a `.env`; usa una clave de Resend recién genera
 
 ```env
 JWT_ALGORITHM=HS256
-ACCESS_TOKEN_MINUTES=120
+ACCESS_TOKEN_EXPIRE_MINUTES=120
 FRONTEND_URL=http://127.0.0.1:3001
 BACKOFFICE_ORIGIN=http://127.0.0.1:3001
 RESEND_API_KEY=re_replace_with_your_new_resend_key
@@ -62,8 +63,12 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 
 ## API
 
+- `POST /users` (requiere JWT; rol predeterminado `user`)
+- `GET /users` (requiere rol `admin`)
+- `GET /users/{user_id}`, `PUT /users/{user_id}`, `DELETE /users/{user_id}` (propietario o admin; el rol/estado solo lo cambia un admin)
+- `GET /profiles/me`, `PUT /profiles/me` (JWT)
 - `POST /auth/login`
-- `GET /auth/me`
+- `GET /auth/me` (email, rol y perfil)
 - `POST /auth/change-password` (requiere JWT y contraseña actual)
 - `POST /auth/forgot-password`
 - `POST /auth/reset-password`
@@ -79,9 +84,11 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 - `PATCH /suppliers/{id}/status`
 - `DELETE /suppliers/{id}`
 
-Los endpoints del directorio `/suppliers` no requieren JWT en este hito. Los endpoints de tickets e inventario conservan las reglas de autenticación descritas arriba; las excepciones públicas existentes son `/health`, `/auth/login`, `/auth/forgot-password` y `/auth/reset-password`.
+Todos los endpoints de `/users`, `/profiles`, `/suppliers`, `/inventory` e incidencias requieren autenticación. Las excepciones públicas son `/health`, `/auth/login`, `/auth/forgot-password` y `/auth/reset-password`.
 
-Los endpoints `GET /inventory/products`, `GET /inventory/products/{asset_id}` y `GET /inventory/orders` son públicos; las escrituras requieren JWT. Se puede filtrar productos u órdenes por `office=Valencia` o `office=Miami`. El stock se calcula como entradas menos salidas y nunca se almacena en `Asset`. Las salidas no pueden dejar stock negativo.
+La clave de firma se lee desde `JWT_SECRET`; la expiración se configura con `ACCESS_TOKEN_EXPIRE_MINUTES` (se conserva `ACCESS_TOKEN_MINUTES` como alias compatible). Los JWT llevan el ID de documento TinyDB en `sub`. Las cuentas legacy se migran al autenticarse: `password_hash` pasa a `hashed_password` y `name` se mueve a su perfil. Las credenciales y perfiles no se guardan en PostgreSQL/Supabase.
+
+Se puede filtrar productos u órdenes por `office=Valencia` o `office=Miami`. El stock se calcula como entradas menos salidas y nunca se almacena en `Asset`. Las salidas no pueden dejar stock negativo.
 
 El router incluye productos, entradas y salidas con `user_uuid` del usuario TinyDB autenticado. Las cuentas existentes reciben su UUID cuando registran su primer movimiento; las nuevas lo reciben al crearse. Los movimientos de muestra usan un UUID reservado de sistema. Las semillas incluyen seis assets, cinco entradas y tres salidas y se mantienen idempotentes entre reinicios.
 

@@ -42,7 +42,7 @@
 
 - No inventar información de negocio fuera de `CONTEXT.md`.
 - Tratar `customer_email` como dato sensible: nunca mostrar correos individuales.
-- El backoffice usa cuentas internas administradas; no habilitar registro público.
+- El backoffice sigue siendo interno y no incorpora una pantalla pública de alta; `POST /users` también requiere una sesión JWT válida.
 - No fabricar tickets históricos si el CSV real no está en el repositorio.
 - No reemplazar stack existente ni introducir dependencias innecesarias.
 
@@ -76,7 +76,8 @@ Como no hay runner global en raíz, los comandos se ejecutan por proyecto o medi
 - El backoffice consume `/backend/*`; Next reenvía las solicitudes a `http://backend:8001` mediante la red `nexova-dev-network`.
 - FastAPI se ejecuta con Uvicorn `--reload` en una imagen Python slim cuyas dependencias se instalan con `uv`.
 - Se reutiliza el patrón FastAPI + bcrypt + JWT del proyecto de referencia, adaptado al dominio Nexova.
-- Las cuentas se provisionan con un script local; no existe endpoint de registro.
+- `User` y `Profile` viven únicamente en TinyDB; `POST /users` asigna el rol `user` por defecto y `scripts.create_user` continúa disponible para provisionamiento local.
+- `get_current_user` usa `OAuth2PasswordBearer` y JWT firmado con `python-jose`; las contraseñas usan `libpass[bcrypt]`. La expiración se configura con `ACCESS_TOKEN_EXPIRE_MINUTES` y conserva `ACCESS_TOKEN_MINUTES` como alias.
 - El cambio de contraseña requiere la clave actual; la recuperación usa tokens de un solo uso y Resend. `RESEND_API_KEY` solo se configura en `.env` local.
 - TinyDB persiste usuarios y tickets localmente; el correo del cliente se excluye de las respuestas públicas y la UI.
 - El backoffice sirve en `http://localhost:3001/`; en Docker usa un proxy del mismo origen hacia la API para evitar exponer nombres internos al navegador.
