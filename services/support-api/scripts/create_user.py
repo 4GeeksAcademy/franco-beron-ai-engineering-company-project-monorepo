@@ -1,4 +1,5 @@
 from getpass import getpass
+from uuid import uuid4
 
 from pydantic import TypeAdapter, ValidationError
 from pydantic.networks import EmailStr
@@ -34,6 +35,7 @@ def main():
 
     users.insert(
         {
+            "uuid": str(uuid4()),
             "email": str(email).lower(),
             "name": name,
             "password_hash": hash_password(password),

@@ -30,6 +30,7 @@ services:
     working_dir: /app/support-api
     environment:
       JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_DATABASE_URL: ${SUPABASE_DATABASE_URL:-}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       ACCESS_TOKEN_MINUTES: ${ACCESS_TOKEN_MINUTES}
       FRONTEND_URL: ${FRONTEND_URL}

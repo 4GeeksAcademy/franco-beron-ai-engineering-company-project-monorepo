@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from contextlib import asynccontextmanager
 import logging
 
 from fastapi import (
@@ -12,11 +13,11 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError
 from tinydb import Query as TinyQuery
 
+from app.auth import get_current_user
 from app.config import BACKOFFICE_ORIGIN
+from app.database import initialize_inventory_database
 from app.db import incidents, reset_tokens, users
 from app.email_service import send_password_reset_email
 from app.incident_rules import (
@@ -38,17 +39,24 @@ from app.schemas import (
     ResetPasswordRequest,
     UserPublic,
 )
+from app.routers.inventory import router as inventory_router
 from app.security import (
     create_access_token,
     create_reset_token,
-    decode_access_token,
     hash_password,
     hash_reset_token,
     verify_password,
 )
 
 
-app = FastAPI(title="Nexova Support API")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    initialize_inventory_database()
+    yield
+
+
+app = FastAPI(title="Nexova Support API", lifespan=lifespan)
+app.include_router(inventory_router)
 logger = logging.getLogger(__name__)
 app.add_middleware(
     CORSMiddleware,
@@ -59,7 +67,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-bearer = HTTPBearer(auto_error=False)
 UserQuery = TinyQuery()
 IncidentQuery = TinyQuery()
 ResetQuery = TinyQuery()
@@ -119,34 +126,6 @@ def public_incident(incident) -> dict:
         "created_at": incident["created_at"],
         "updated_at": incident["updated_at"],
     }
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-):
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No autenticado.",
-        )
-
-    try:
-        payload = decode_access_token(credentials.credentials)
-        user_id = int(payload["sub"])
-    except (JWTError, KeyError, ValueError, RuntimeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado.",
-        )
-
-    user = users.get(doc_id=user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario no encontrado.",
-        )
-
-    return user
 
 
 @app.get("/health")
