@@ -57,3 +57,26 @@ Abrir `http://127.0.0.1:3001/`.
 - Sistema visual accesible con foco visible, controles tactiles de al menos 44 px y movimiento reducido cuando el sistema lo solicita.
 - Indicadores de SLA, resumen de tickets, filtros, estados y feedback de carga/error diferenciados visualmente.
 - Resumen operativo, alta y seguimiento de tickets alineados con `CONTEXT.md`.
+
+## Gestión de inventario
+
+La sección de inventario reutiliza la sesión JWT guardada por el login existente y el proxy `/backend` de Next.js. No requiere una segunda aplicación ni almacena tokens en URLs.
+
+| Ruta                                    | Uso                                                                       |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| `/backoffice/inventory/products`        | Catálogo de assets, oficina, SKU, stock calculado e indicadores de nivel. |
+| `/backoffice/inventory/orders/inbound`  | Formulario para registrar entradas de proveedor.                          |
+| `/backoffice/inventory/orders/outbound` | Asignación o consumo, con stock consultado al elegir el asset.            |
+| `/backoffice/inventory/orders`          | Historial de solo lectura con tipo, fecha y `user_uuid`.                  |
+
+Las cuatro rutas verifican la sesión con `/auth/me` y redirigen a `/` con un destino de retorno si no hay una sesión válida. Las llamadas de inventario están centralizadas en `lib/inventory.js`; los errores HTTP se muestran en la página. Una salida por encima de las existencias avisa antes del envío y los errores `400` de la API aparecen junto al campo de cantidad.
+
+El catálogo marca como bajo el stock menor que cinco unidades y como agotado el stock cero. Estos indicadores son orientativos; el backend calcula el stock real y valida cada salida.
+
+En Docker, el cliente usa `/backend` por defecto y Next reenvía las solicitudes a `backend:8001`. Para desarrollo sin Docker se puede crear `.env.local` en `uis/backoffice` con:
+
+```env
+NEXT_PUBLIC_INVENTORY_API_URL=http://127.0.0.1:8001
+```
+
+Ese archivo está ignorado por Git. La URL solo configura el endpoint del backend; nunca coloques tokens ni credenciales de Supabase en variables `NEXT_PUBLIC_*`.
