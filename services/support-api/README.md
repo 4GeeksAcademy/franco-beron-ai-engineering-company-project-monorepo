@@ -6,6 +6,7 @@ API privada para el backoffice de soporte. Sigue el patrón de autenticación de
 
 - Login interno con bcrypt y JWT. No existe registro público.
 - Las cuentas se crean de forma administrada con `scripts/create_user.py`.
+- Gestión de inventario con SQLModel y Supabase/PostgreSQL; TinyDB continúa almacenando usuarios y tickets.
 - Tickets con categorías `TECHNICAL`, `BILLING`, `ACCESS`, `HR_QUERY` y `COMPLAINT`.
 - Estados `OPEN`, `CLOSED` y `DISCARDED`; un ticket `CLOSED` requiere puntuación de satisfacción entre 1 y 5.
 - `customer_email` se valida y persiste, pero se excluye de las respuestas y no se registra en logs.
@@ -44,9 +45,12 @@ FRONTEND_URL=http://127.0.0.1:3001
 BACKOFFICE_ORIGIN=http://127.0.0.1:3001
 RESEND_API_KEY=re_replace_with_your_new_resend_key
 EMAIL_FROM=Nexova Ops <onboarding@resend.dev>
+SUPABASE_DATABASE_URL=postgresql://postgres.radocsbpprqanytbupmo:<URL_ENCODED_PASSWORD>@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require
 ```
 
 `onboarding@resend.dev` sirve para pruebas limitadas de Resend. Para el uso normal, configura un remitente de un dominio verificado en Resend. Reinicia Uvicorn después de editar `.env`.
+
+Para Docker, define también `SUPABASE_DATABASE_URL` en el `.env` de la raíz. El ejemplo usa el shared pooler en modo transaccional (puerto `6543`); reemplaza `<URL_ENCODED_PASSWORD>` con la contraseña real, codificando caracteres reservados como `%40` para `@`. No guardes la URI en Git. Psycopg desactiva prepared statements para compatibilidad con el pooler. Sin esta variable la API y la autenticación siguen disponibles, pero los endpoints de inventario responden `503`. Al iniciar con la URI configurada, la API crea las tablas y carga las semillas de desarrollo mediante `SQLModel.metadata.create_all()`.
 
 ```bash
 python -m scripts.create_user
@@ -69,6 +73,12 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 - `PATCH /api/incidents/{ticket_id}/status`
 
 Todos los endpoints salvo `/health`, `/auth/login`, `/auth/forgot-password` y `/auth/reset-password` requieren `Authorization: Bearer <JWT>`.
+
+Los endpoints `GET /inventory/products`, `GET /inventory/products/{asset_id}` y `GET /inventory/orders` son públicos; las escrituras requieren JWT. Se puede filtrar productos u órdenes por `office=Valencia` o `office=Miami`. El stock se calcula como entradas menos salidas y nunca se almacena en `Asset`. Las salidas no pueden dejar stock negativo.
+
+El router incluye productos, entradas y salidas con `user_uuid` del usuario TinyDB autenticado. Las cuentas existentes reciben su UUID cuando registran su primer movimiento; las nuevas lo reciben al crearse. Los movimientos de muestra usan un UUID reservado de sistema. Las semillas incluyen seis assets, cinco entradas y tres salidas y se mantienen idempotentes entre reinicios.
+
+Las tablas SQLModel y las schemas Pydantic están separadas en `app/models.py` y `app/schemas.py`; la sesión PostgreSQL se inyecta por request desde `app/database.py`. `create_all()` es adecuado para este hito de desarrollo; producción requiere migraciones.
 
 La recuperación devuelve la misma respuesta tanto si la cuenta existe como si no. Los tokens se guardan hasheados, vencen en 30 minutos y solo se aceptan una vez. El correo se envía a la cuenta interna; no se usa `customer_email` para recuperación.
 

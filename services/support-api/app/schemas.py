@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, datetime
 import re
 from typing import Literal
 
 from pydantic import (
     BaseModel,
+    ConfigDict,
     EmailStr,
     Field,
     field_validator,
@@ -158,3 +159,109 @@ class IncidentSummary(BaseModel):
     by_category: dict[str, int]
     closed_scored: int
     average_satisfaction: float | None
+
+
+Office = Literal["Valencia", "Miami"]
+AssetCategory = Literal[
+    "hardware",
+    "peripherals",
+    "office_supplies",
+    "training_materials",
+]
+
+
+class AssetCreate(BaseModel):
+    name: str = Field(min_length=1)
+    sku: str = Field(min_length=1)
+    category: AssetCategory
+    office: Office
+
+    @field_validator("name", "sku")
+    @classmethod
+    def trim_required_text(cls, value: str) -> str:
+        clean_value = value.strip()
+        if not clean_value:
+            raise ValueError("El campo es obligatorio")
+        return clean_value
+
+
+class AssetPublic(BaseModel):
+    id: int
+    name: str
+    sku: str
+    category: AssetCategory
+    office: Office
+    current_stock: int
+
+
+class AssetEntryCreate(BaseModel):
+    asset_id: int = Field(gt=0)
+    quantity: int = Field(gt=0)
+    supplier: str = Field(min_length=1)
+    office: Office
+
+    @field_validator("supplier")
+    @classmethod
+    def clean_supplier(cls, value: str) -> str:
+        clean_value = value.strip()
+        if not clean_value:
+            raise ValueError("supplier es obligatorio")
+        return clean_value
+
+
+class AssetEntryPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    asset_id: int
+    quantity: int
+    supplier: str
+    office: Office
+    created_at: datetime
+    user_uuid: str
+
+
+class AssetExitCreate(BaseModel):
+    asset_id: int = Field(gt=0)
+    quantity: int = Field(gt=0)
+    exit_type: Literal["allocation", "consumption"]
+    assigned_to: str | None = None
+    office: Office
+
+    @model_validator(mode="after")
+    def assigned_to_matches_exit_type(self):
+        if self.exit_type == "allocation":
+            if self.assigned_to is None or not self.assigned_to.strip():
+                raise ValueError("assigned_to es obligatorio para allocation")
+            self.assigned_to = self.assigned_to.strip()
+        elif self.assigned_to is not None:
+            raise ValueError("assigned_to debe ser null para consumption")
+        return self
+
+
+class AssetExitPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    asset_id: int
+    quantity: int
+    exit_type: Literal["allocation", "consumption"]
+    assigned_to: str | None
+    office: Office
+    created_at: datetime
+    user_uuid: str
+
+
+class InventoryOrderPublic(BaseModel):
+    id: int
+    order_type: Literal["inbound", "outbound"]
+    asset_id: int
+    asset_name: str
+    asset_sku: str
+    quantity: int
+    office: Office
+    created_at: datetime
+    user_uuid: str
+    supplier: str | None = None
+    exit_type: Literal["allocation", "consumption"] | None = None
+    assigned_to: str | None = None

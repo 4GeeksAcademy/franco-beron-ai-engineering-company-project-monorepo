@@ -158,3 +158,36 @@
 - `docker compose config --quiet`, `sh -n`, `node --check`, diagnósticos y `git diff --check`: aprobados.
 - Bind mount `uis/` hacia `/app` confirmado para recarga en caliente.
 - `.env` ignorado, no rastreado y ausente del historial Git.
+
+## Gestión de inventario con SQLModel (2026-10-09)
+
+- Se creó la rama local `feature/gestion-inventario` desde `feature/containerization`.
+- Se añadió SQLModel con `psycopg` y una conexión opcional a PostgreSQL/Supabase mediante `SUPABASE_DATABASE_URL`; TinyDB sigue siendo la persistencia de autenticación y tickets.
+- Se añadieron modelos separados `Asset`, `AssetEntry` y `AssetExit`, con claves foráneas, sesiones SQLModel por request y creación de esquema al iniciar cuando existe configuración.
+- Se añadió el router `/inventory` con seis operaciones: listado/creación/detalle de assets y creación/listado de entradas y salidas. Las escrituras requieren JWT; los GET son públicos.
+- El stock se calcula como entradas menos salidas; las salidas excesivas responden HTTP 400 antes de persistir. `office` filtra lecturas y queda en modelos/respuestas.
+- Se agregaron seis assets, cinco entradas y tres salidas semilla idempotentes. Las cuentas nuevas reciben UUID al crearse y las existentes al efectuar su primer movimiento.
+- Se documentó la variable Supabase y el funcionamiento local. No se pudo actualizar `.env.example` porque el workspace lo protege; no contiene credenciales y `.env` continúa ignorado por Git.
+
+### Validaciones
+
+- Instalación/resolución de dependencias con `uv pip install --system -r services/support-api/requirements.txt`: aprobada.
+- Suite existente del backend: 15 pruebas aprobadas.
+- Smoke test de inventario en SQLite: stock semilla correcto, salida excesiva HTTP 400 y sin escritura parcial.
+- OpenAPI: seis operaciones registradas, POST autenticados y GET públicos.
+- `compileall`, Compose `config --quiet`, `git diff --check` y diagnósticos del editor: aprobados.
+- En la verificación inicial no se probó la conexión real por falta de `SUPABASE_DATABASE_URL`; se configuró después y se validó con `SELECT 1` el 2026-10-10.
+
+### Configuración del shared pooler y Agent Skills (2026-10-09)
+
+- Se documentó la URI de Supabase suministrada para `aws-0-us-east-1.pooler.supabase.com:6543`, con el usuario y una marca explícita para completar la contraseña codificada localmente; no se escribió ni solicitó ningún secreto.
+- Se configuró Psycopg con `prepare_threshold=None`, requerido por el modo transaction pooling del puerto 6543 según la documentación oficial actual de Supabase.
+- Se instalaron las skills oficiales `supabase` y `supabase-postgres-best-practices` mediante `npx skills add supabase/agent-skills`; el instalador también generó `.claude/` y `skills-lock.json`.
+- El `.env` local ya existía y no se sobrescribió; la contraseña se mantuvo fuera del chat y no se guardó en archivos rastreados. La conexión se verificó en la etapa siguiente.
+
+### Inicialización real en Supabase (2026-10-10)
+
+- Con autorización del desarrollador se ejecutó `docker compose up --build -d backend`; el contenedor quedó `healthy` y el lifespan creó las tablas SQLModel y cargó semillas.
+- `GET /inventory/products` devolvió seis assets con stock neto verificado: `NXV-IT-001=13`, `NXV-IT-002=0`, `NXV-PER-002=11` y `NXV-OFF-001=97`.
+- Consulta de solo lectura a `information_schema` y conteos confirmó `asset=6`, `assetentry=5`, `assetexit=3`.
+- No se guardaron credenciales en archivos rastreados ni se registraron en esta bitácora.
