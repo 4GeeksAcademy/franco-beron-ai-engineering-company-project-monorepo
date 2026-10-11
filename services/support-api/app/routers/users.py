@@ -30,7 +30,6 @@ def ensure_can_manage(target_user_id: int, current_user):
 @router.post("", response_model=ManagedUserPublic, status_code=status.HTTP_201_CREATED)
 def register_user(
     payload: UserCreate,
-    current_user=Depends(get_current_user),
 ):
     with operation_errors():
         user, _ = create_user(

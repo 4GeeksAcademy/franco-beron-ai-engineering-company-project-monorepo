@@ -1,6 +1,6 @@
 import { apiErrorMessage, readApiResponse } from "./api-errors.js";
+import { getToken, redirectToLogin } from "./auth.js";
 
-const TOKEN_KEY = "nexova_support_token";
 const API_BASE = (
   process.env.NEXT_PUBLIC_INVENTORY_API_URL || "/backend"
 ).replace(/\/$/, "");
@@ -13,22 +13,12 @@ export class SupplierApiError extends Error {
   }
 }
 
-function redirectToLogin() {
-  if (typeof window === "undefined") return;
-  const returnTo = `${window.location.pathname}${window.location.search}`;
-  window.sessionStorage.removeItem(TOKEN_KEY);
-  window.location.assign(`/?next=${encodeURIComponent(returnTo)}`);
-}
-
 function errorMessage(payload, status) {
   return apiErrorMessage(status);
 }
 
 async function request(path, { method = "GET", body } = {}) {
-  const token =
-    typeof window === "undefined"
-      ? null
-      : window.sessionStorage.getItem(TOKEN_KEY);
+  const token = getToken();
   if (!token) {
     redirectToLogin();
     throw new SupplierApiError("Inicia sesión para continuar.", 401);

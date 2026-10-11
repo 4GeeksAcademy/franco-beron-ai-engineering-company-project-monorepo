@@ -4,7 +4,7 @@ API privada para el backoffice de soporte. Sigue el patrón de autenticación de
 
 ## Alcance
 
-- Autenticación JWT con `OAuth2PasswordBearer`, `python-jose` y `libpass[bcrypt]`; el alta mediante `POST /users` requiere una sesión válida y el backoffice no incorpora una pantalla pública de registro.
+- Autenticación JWT con `OAuth2PasswordBearer`, `python-jose` y `libpass[bcrypt]`; el alta mediante `POST /users` es pública y el backoffice la consume desde la pantalla de registro `/register`.
 - `User` y `Profile` se guardan únicamente en TinyDB. Los roles válidos son `admin`, `manager` y `user`; el alta asigna `user` por defecto.
 - `scripts/create_user.py` continúa disponible para provisionar cuentas directamente en TinyDB, asignar un rol controlado y crear su perfil inicial.
 - Gestión de inventario con SQLModel y Supabase/PostgreSQL; TinyDB también almacena tickets y proveedores.
@@ -63,7 +63,7 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 
 ## API
 
-- `POST /users` (requiere JWT; rol predeterminado `user`)
+- `POST /users` (público — alta de cuenta; rol predeterminado `user`)
 - `GET /users` (requiere rol `admin`)
 - `GET /users/{user_id}`, `PUT /users/{user_id}`, `DELETE /users/{user_id}` (propietario o admin; el rol/estado solo lo cambia un admin)
 - `GET /profiles/me`, `PUT /profiles/me` (JWT)
@@ -84,7 +84,7 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 - `PATCH /suppliers/{id}/status`
 - `DELETE /suppliers/{id}`
 
-Todos los endpoints de `/users`, `/profiles`, `/suppliers`, `/inventory` e incidencias requieren autenticación. Las excepciones públicas son `/health`, `/auth/login`, `/auth/forgot-password` y `/auth/reset-password`.
+Todos los endpoints de `/users`, `/profiles`, `/suppliers`, `/inventory` e incidencias requieren autenticación, salvo `POST /users` (registro público). Las otras excepciones públicas son `/health`, `/auth/login`, `/auth/forgot-password` y `/auth/reset-password`.
 
 La clave de firma se lee desde `JWT_SECRET`; la expiración se configura con `ACCESS_TOKEN_EXPIRE_MINUTES` (se conserva `ACCESS_TOKEN_MINUTES` como alias compatible). Los JWT llevan el ID de documento TinyDB en `sub`. Las cuentas legacy se migran al autenticarse: `password_hash` pasa a `hashed_password` y `name` se mueve a su perfil. Las credenciales y perfiles no se guardan en PostgreSQL/Supabase.
 

@@ -3,9 +3,12 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
-import { getCurrentUser } from "../lib/inventory";
-
-const TOKEN_KEY = "nexova_support_token";
+import {
+  clearToken,
+  getCurrentUser,
+  getToken,
+  redirectToLogin,
+} from "../lib/auth";
 
 const navigation = [
   {
@@ -44,6 +47,12 @@ const navigation = [
     icon: "history",
     id: "orders",
   },
+  {
+    href: "/account/profile",
+    label: "Mi perfil",
+    icon: "user-circle",
+    id: "profile",
+  },
 ];
 
 function icon(name) {
@@ -70,17 +79,17 @@ export default function InventoryShell({
 
     let activeEffect = true;
     const returnTo = `${window.location.pathname}${window.location.search}`;
-    const loginUrl = `/?next=${encodeURIComponent(returnTo)}`;
-    const token = window.sessionStorage.getItem(TOKEN_KEY);
+    const token = getToken();
 
     if (!token) {
-      void router.replace(loginUrl);
+      redirectToLogin(returnTo);
       return () => {
         activeEffect = false;
       };
     }
 
     setAuth({ status: "checking", user: null, error: "" });
+
     getCurrentUser(token)
       .then((user) => {
         if (activeEffect) setAuth({ status: "ready", user, error: "" });
@@ -88,8 +97,7 @@ export default function InventoryShell({
       .catch((error) => {
         if (!activeEffect) return;
         if (error.status === 401) {
-          window.sessionStorage.removeItem(TOKEN_KEY);
-          void router.replace(loginUrl);
+          redirectToLogin(returnTo);
           return;
         }
         setAuth({
@@ -109,8 +117,8 @@ export default function InventoryShell({
   }, [auth.status, active, children]);
 
   function logout() {
-    window.sessionStorage.removeItem(TOKEN_KEY);
-    void router.replace("/");
+    clearToken();
+    redirectToLogin();
   }
 
   if (auth.status === "checking") {
