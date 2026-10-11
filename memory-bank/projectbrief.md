@@ -32,6 +32,8 @@ El proyecto actual se enfoca en una utilidad de análisis de datos para reportes
 
 El monorepo también incorpora un hito de gestión interna de inventario de activos y suministros para las oficinas de Valencia y Miami. El stock se deriva de entradas y salidas registradas, y las operaciones quedan asociadas al usuario interno que las crea.
 
+El backoffice de Nexova incorpora además un directorio operativo de proveedores de selección, RR. HH. y servicios de oficina, con filtros por país/categoría, tarifas mensuales, estados y renovaciones contractuales.
+
 ## Objetivos del proyecto
 
 - Entregar análisis operativo fiable para revisión con clientes.

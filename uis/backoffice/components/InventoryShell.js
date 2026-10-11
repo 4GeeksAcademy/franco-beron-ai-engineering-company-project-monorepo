@@ -9,6 +9,12 @@ const TOKEN_KEY = "nexova_support_token";
 
 const navigation = [
   {
+    href: "/backoffice/suppliers",
+    label: "Proveedores",
+    icon: "building-2",
+    id: "suppliers",
+  },
+  {
     href: "/backoffice/inventory/products",
     label: "Activos",
     icon: "boxes",
@@ -42,6 +48,7 @@ export default function InventoryShell({
   active,
   title,
   description,
+  eyebrow = "Operaciones · Inventario",
   children,
 }) {
   const router = useRouter();
@@ -178,7 +185,7 @@ export default function InventoryShell({
         <main className="content inventory-content">
           <header className="content-header inventory-header">
             <div>
-              <p className="kicker">Operaciones · Inventario</p>
+              <p className="kicker">{eyebrow}</p>
               <h1>{title}</h1>
               <p className="header-copy">{description}</p>
             </div>

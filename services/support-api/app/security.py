@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
 
-import bcrypt
+from passlib.hash import bcrypt
 from jose import JWTError, jwt
 
 from app.config import ACCESS_TOKEN_MINUTES, JWT_ALGORITHM, JWT_SECRET
@@ -12,15 +12,12 @@ def hash_password(password: str) -> str:
     encoded = password.encode("utf-8")
     if len(encoded) > 72:
         raise ValueError("La contraseña supera el límite permitido")
-    return bcrypt.hashpw(encoded, bcrypt.gensalt()).decode("ascii")
+    return bcrypt.hash(password)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
     try:
-        return bcrypt.checkpw(
-            password.encode("utf-8"),
-            password_hash.encode("ascii"),
-        )
+        return bcrypt.verify(password, password_hash)
     except (ValueError, UnicodeError):
         return False
 

@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from enum import Enum
 import re
 from typing import Literal
 
@@ -38,16 +39,115 @@ class LoginRequest(BaseModel):
         return value
 
 
-class UserPublic(BaseModel):
+class UserRole(str, Enum):
+    admin = "admin"
+    manager = "manager"
+    user = "user"
+
+
+class UserCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=72)
+    name: str | None = Field(default=None, max_length=160)
+    phone: str | None = Field(default=None, max_length=80)
+    address: str | None = Field(default=None, max_length=300)
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("La contraseña supera el límite permitido")
+        return value
+
+    @field_validator("name", "phone", "address")
+    @classmethod
+    def strip_profile_values(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean_value = value.strip()
+        return clean_value or None
+
+
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=72)
+    role: UserRole | None = None
+    is_active: bool | None = None
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, value: str | None) -> str | None:
+        if value is not None and len(value.encode("utf-8")) > 72:
+            raise ValueError("La contraseña supera el límite permitido")
+        return value
+
+    @model_validator(mode="after")
+    def has_changes(self):
+        if not self.model_fields_set:
+            raise ValueError("Se requiere al menos un campo para actualizar")
+        return self
+
+
+class ManagedUserPublic(BaseModel):
+    id: int
+    email: EmailStr
+    is_active: bool
+    role: UserRole
+    created_at: datetime
+
+
+class LoginUserPublic(BaseModel):
     id: int
     email: EmailStr
     name: str
+    role: UserRole
+
+
+class ProfilePublic(BaseModel):
+    id: int
+    user_id: int
+    name: str | None = None
+    phone: str | None = None
+    address: str | None = None
+
+
+class ProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, max_length=160)
+    phone: str | None = Field(default=None, max_length=80)
+    address: str | None = Field(default=None, max_length=300)
+
+    @field_validator("name", "phone", "address")
+    @classmethod
+    def strip_profile_values(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean_value = value.strip()
+        return clean_value or None
+
+    @model_validator(mode="after")
+    def has_changes(self):
+        if not self.model_fields_set:
+            raise ValueError("Se requiere al menos un campo para actualizar")
+        return self
+
+
+class AuthMeResponse(BaseModel):
+    id: int
+    email: EmailStr
+    role: UserRole
+    profile: ProfilePublic
 
 
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str
-    user: UserPublic
+    user: LoginUserPublic
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -265,3 +365,81 @@ class InventoryOrderPublic(BaseModel):
     supplier: str | None = None
     exit_type: Literal["allocation", "consumption"] | None = None
     assigned_to: str | None = None
+
+
+SupplierCountry = Literal["Spain", "USA"]
+SupplierCurrency = Literal["EUR", "USD"]
+SupplierStatus = Literal["active", "suspended"]
+SupplierCategory = Literal[
+    "job_boards",
+    "ats_software",
+    "assessment_tools",
+    "training_platforms",
+    "payroll_and_hr_software",
+    "video_interview",
+    "background_check",
+    "office_and_facilities",
+    "it_and_software_licenses",
+]
+
+
+class SupplierCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=160)
+    country: SupplierCountry
+    categories: list[SupplierCategory] = Field(min_length=1)
+    monthly_rate: float = Field(gt=0, allow_inf_nan=False)
+    currency: SupplierCurrency
+    status: SupplierStatus
+    contract_renewal_date: str | None = None
+    contact_email: EmailStr | None = None
+    notes: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_supplier_name(cls, value: str) -> str:
+        clean_value = value.strip()
+        if not clean_value:
+            raise ValueError("name es obligatorio")
+        return clean_value
+
+    @field_validator("contract_renewal_date")
+    @classmethod
+    def validate_renewal_date(cls, value: str | None) -> str | None:
+        if value is not None:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+                raise ValueError("contract_renewal_date debe usar YYYY-MM-DD")
+            date.fromisoformat(value)
+        return value
+
+    @model_validator(mode="after")
+    def currency_matches_country(self):
+        expected_currency = "EUR" if self.country == "Spain" else "USD"
+        if self.currency != expected_currency:
+            raise ValueError(
+                f"currency debe ser {expected_currency} para {self.country}"
+            )
+        return self
+
+
+class SupplierRateUpdate(BaseModel):
+    monthly_rate: float = Field(gt=0, allow_inf_nan=False)
+
+
+class SupplierStatusUpdate(BaseModel):
+    status: SupplierStatus
+
+
+class SupplierPublic(BaseModel):
+    id: int
+    name: str
+    country: SupplierCountry
+    categories: list[SupplierCategory]
+    monthly_rate: float
+    currency: SupplierCurrency
+    updated_at: datetime
+    status: SupplierStatus
+    contract_renewal_date: str | None = None
+    contact_email: EmailStr | None = None
+    notes: str | None = None

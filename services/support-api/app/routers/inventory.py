@@ -18,7 +18,11 @@ from app.schemas import (
 )
 
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(
+    prefix="/inventory",
+    tags=["inventory"],
+    dependencies=[Depends(get_current_user)],
+)
 DatabaseSession = Annotated[Session, Depends(get_db)]
 AuthenticatedUser = Annotated[dict, Depends(get_current_user)]
 
