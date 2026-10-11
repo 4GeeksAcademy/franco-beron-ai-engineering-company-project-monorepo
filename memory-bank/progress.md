@@ -238,3 +238,31 @@
 - Documentación técnica actualizada en `services/support-api/README.md`, `services/README.md` y `memory-bank/techContext.md`.
 - Validaciones: smoke test aislado en TinyDB en memoria para registro/login/perfiles/CRUD/403/401/tokens inválidos y expirados/rutas protegidas; migración y cambio de contraseña legacy; suite backend existente (15 pruebas); compilación; `uv lock --check`; diagnósticos del editor y `git diff --check` aprobados.
 - Ajuste posterior solicitado: `POST /users` requiere ahora un JWT válido, por lo que todas las rutas salvo health, login y recuperación de contraseña requieren autenticación. Se validó `401` sin token y `201` con token en un smoke test aislado.
+
+## Gestor de incidencias Nexova (2026-10-10)
+
+- Se validó que el gestor ya existía en la rama y no requería un reescrito destructivo: la ruta de backend estaba implementada en `services/support-api/app/routers/incidents.py`, y la UI estaba en `uis/backoffice/pages/backoffice/incidents.js`.
+- Se corrigió el acceso desde el backoffice interno agregando la entrada `Incidencias` al sidebar del shell compartido para que la funcionalidad fuera visible y navegable.
+- Se modernizó la UI del dashboard de incidencias con layout tipo panel, badges de estado, resumen por métricas, filtros y tarjetas de seguimiento, manteniendo la lógica de negocio original intacta.
+- Validaciones realizadas: `uv run python -m unittest discover -s tests` (15 pruebas OK), `uv run python -m compileall -q app scripts` (OK), `npx next build` en `uis/backoffice` (compile OK), y smoke test real de flujo JWT + POST/GET `/api/incidents` (login, `/auth/me`, creación de incidencia y resumen OK).
+- Estado final: el requisito del gestor de incidencias queda cubierto por la implementación actual, la navegación accesible y la UI mejorada; no faltan puntos funcionales relevantes frente a la documentación del proyecto.
+
+## Auditoría de error handling (2026-10-10)
+
+### Ampliación para cubrir el README completo
+
+- La primera entrega no cubría toda la auditoría: se completaron clientes frontend, acciones de reintento, campos nulos, captura local en rutas y scripts administrativos en la misma rama `feature/error-handling`.
+- Frontend: estados carga/éxito/error separados, salida de carga por transiciones o `finally`, CTA en cargas de activos y stock, mensajes HTTP saneados, timeout de fetch y rechazo de JSON inválido o listados nulos. El website no contiene fetch de datos que requiera esos estados.
+- Backend: 34 handlers conservan rutas y firmas y capturan fallos de operación; se mantienen `400/404/422`, SQL indisponible devuelve `503`, errores inesperados `500` y los fallos SQL hacen rollback. El handler global permanece como respaldo.
+- Privacidad: validación y logs no muestran texto de excepciones ni entradas. Correo saneado y timeout de 30 segundos del transporte Resend instalado; no hay llamadas LLM en este alcance.
+- Scripts: CSV estricto validado antes de escritura, fallos de UTF-8/permisos/persistencia a `stderr` y código `1`; creación de usuarios y seed de proveedores no reportan éxito ante fallos. La limpieza pandas solo imprime agregados, no filas ni encabezados.
+- Validaciones: 21 pruebas backend aprobadas, tres pruebas de clientes aprobadas (red/500/parsing/nulos/éxito), build Next aprobado y backoffice existente en puerto 3001 con HTTP 200. No se usaron credenciales ni se escribieron datos en Supabase.
+- Limitaciones: sin navegador instalado para prueba visual de carga/error/reintento; Pylance sigue indicando importación `app.config` no resuelta en el script de raíz aunque su ejecución y tests resuelven la ruta. La utilidad pandas requiere su dependencia opcional y no se ejecutó con un CSV real.
+- Cambios de esta ampliación sin commit ni push; no se modificaron `.env`, configuración Docker, esquema de base de datos ni archivos críticos.
+
+- Se creó la rama `feature/error-handling` desde `feature/gestor-incidencias` para aislar la auditoría de resiliencia sin mezclar trabajo funcional nuevo.
+- Se revisó la referencia externa de la auditoría y se aplicaron los patrones requeridos: manejo de errores a nivel de operación, mensajes legibles para usuario y salidas seguras en scripts.
+- Se reforzó el manejo general de excepciones en `services/support-api/app/main.py` con registro de errores en backend y respuesta JSON sin revelar trazas, rutas internas ni secretos.
+- Se añadió una ruta defensiva en `scripts/seed_incidents.py` con `load_csv_rows()` para capturar archivos no existentes o CSV corruptos y devolver `exit code 1` con mensajes a `stderr`.
+- Se actualizó `skills/data-analysis/scripts/pandas_clean.py` para abortar con `SystemExit(1)` en ficheros faltantes o datos inválidos y evitar impresiones de datasets completos que puedan filtrar contenido sensible.
+- Validaciones: `uv run python -m unittest discover -s tests` en `services/support-api` (16 pruebas OK), `python scripts/seed_incidents.py /tmp/does-not-exist.csv` devuelve `exit=1` con mensaje amigable en `stderr`, y `npx next build` en `uis/backoffice` compila correctamente.

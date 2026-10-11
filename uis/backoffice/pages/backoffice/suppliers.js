@@ -523,7 +523,7 @@ export default function SuppliersPage() {
                       <td>{supplier.country}</td>
                       <td>
                         <div className="supplier-category-list">
-                          {supplier.categories.map((category) => (
+                          {(supplier.categories ?? []).map((category) => (
                             <span
                               className="supplier-category-tag"
                               key={category}

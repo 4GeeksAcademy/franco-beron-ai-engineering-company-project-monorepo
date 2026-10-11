@@ -1,10 +1,21 @@
 import Head from "next/head";
+import { useRouter } from "next/router";
 import { useEffect } from "react";
 
+import { isAuthenticated } from "../lib/auth";
+
 export default function Home() {
+  const router = useRouter();
+
   useEffect(() => {
-    import("../main.js");
-  }, []);
+    if (router.isReady) {
+      if (isAuthenticated()) {
+        void router.replace("/backoffice/incidents");
+      } else {
+        void router.replace("/login");
+      }
+    }
+  }, [router]);
 
   return (
     <>
@@ -16,7 +27,10 @@ export default function Home() {
         />
         <meta name="theme-color" content="#17201f" />
       </Head>
-      <div className="layout" id="app" />
+      <main className="inventory-auth-state" role="status">
+        <span className="inventory-spinner" aria-hidden="true" />
+        <p>Redirigiendo…</p>
+      </main>
     </>
   );
 }

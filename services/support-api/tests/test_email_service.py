@@ -31,6 +31,16 @@ class EmailServiceTests(unittest.TestCase):
             send_password_reset_email(to_email="", token="reset-token-value")
         send_email.assert_not_called()
 
+    def test_delivery_failure_is_sanitized(self):
+        with (
+            patch("app.email_service.RESEND_API_KEY", "test-only-key"),
+            patch("app.email_service.resend.Emails.send", side_effect=TimeoutError("private@example.com secret")),
+            self.assertRaises(RuntimeError) as caught,
+        ):
+            send_password_reset_email(to_email="", token="test-token")
+        self.assertNotIn("secret", str(caught.exception))
+        self.assertNotIn("@", str(caught.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

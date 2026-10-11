@@ -32,9 +32,13 @@ export default function OutboundOrderPage() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [quantityError, setQuantityError] = useState("");
+  const [reload, setReload] = useState(0);
+  const [stockReload, setStockReload] = useState(0);
 
   useEffect(() => {
     let current = true;
+    setProductsStatus("loading");
+    setProductsError("");
     getProducts()
       .then((items) => {
         if (!current) return;
@@ -51,7 +55,7 @@ export default function OutboundOrderPage() {
     return () => {
       current = false;
     };
-  }, []);
+  }, [reload]);
 
   useEffect(() => {
     if (!router.isReady || !router.query.asset_id) return;
@@ -70,6 +74,7 @@ export default function OutboundOrderPage() {
 
     let current = true;
     setStockStatus("loading");
+    setQuantityError("");
     getProduct(form.asset_id)
       .then((asset) => {
         if (!current) return;
@@ -88,14 +93,14 @@ export default function OutboundOrderPage() {
     return () => {
       current = false;
     };
-  }, [form.asset_id]);
+  }, [form.asset_id, stockReload]);
 
   const quantity = Number(form.quantity);
   const exceedsStock =
     stockStatus === "ready" &&
     form.quantity !== "" &&
     Number.isFinite(quantity) &&
-    quantity > selectedAsset.current_stock;
+    quantity > (selectedAsset?.current_stock ?? 0);
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -133,7 +138,7 @@ export default function OutboundOrderPage() {
       setForm(emptyForm);
       setSelectedAsset(null);
       setNotice(
-        `Salida registrada: ${result.quantity} unidades de ${selectedAsset.name}.`,
+        `Salida registrada: ${result.quantity} unidades de ${selectedAsset?.name ?? "activo"}.`,
       );
       setStockStatus("empty");
     } catch (requestError) {
@@ -173,6 +178,13 @@ export default function OutboundOrderPage() {
           {productsStatus === "error" && (
             <p className="inventory-alert inventory-alert-error" role="alert">
               {productsError}
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setReload((value) => value + 1)}
+              >
+                {icon("refresh-cw")} Reintentar
+              </button>
             </p>
           )}
           {productsStatus === "ready" && products.length === 0 && (
@@ -221,7 +233,16 @@ export default function OutboundOrderPage() {
                     </>
                   )}
                   {stockStatus === "error" && (
-                    <span role="alert">{quantityError}</span>
+                    <span role="alert">
+                      {quantityError}
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => setStockReload((value) => value + 1)}
+                      >
+                        {icon("refresh-cw")} Reintentar
+                      </button>
+                    </span>
                   )}
                 </div>
               )}

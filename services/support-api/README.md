@@ -4,7 +4,7 @@ API privada para el backoffice de soporte. Sigue el patrón de autenticación de
 
 ## Alcance
 
-- Autenticación JWT con `OAuth2PasswordBearer`, `python-jose` y `libpass[bcrypt]`; el alta mediante `POST /users` requiere una sesión válida y el backoffice no incorpora una pantalla pública de registro.
+- Autenticación JWT con `OAuth2PasswordBearer`, `python-jose` y `libpass[bcrypt]`; el alta mediante `POST /users` es pública y el backoffice la consume desde la pantalla de registro `/register`.
 - `User` y `Profile` se guardan únicamente en TinyDB. Los roles válidos son `admin`, `manager` y `user`; el alta asigna `user` por defecto.
 - `scripts/create_user.py` continúa disponible para provisionar cuentas directamente en TinyDB, asignar un rol controlado y crear su perfil inicial.
 - Gestión de inventario con SQLModel y Supabase/PostgreSQL; TinyDB también almacena tickets y proveedores.
@@ -63,7 +63,7 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 
 ## API
 
-- `POST /users` (requiere JWT; rol predeterminado `user`)
+- `POST /users` (público — alta de cuenta; rol predeterminado `user`)
 - `GET /users` (requiere rol `admin`)
 - `GET /users/{user_id}`, `PUT /users/{user_id}`, `DELETE /users/{user_id}` (propietario o admin; el rol/estado solo lo cambia un admin)
 - `GET /profiles/me`, `PUT /profiles/me` (JWT)
@@ -84,7 +84,7 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 - `PATCH /suppliers/{id}/status`
 - `DELETE /suppliers/{id}`
 
-Todos los endpoints de `/users`, `/profiles`, `/suppliers`, `/inventory` e incidencias requieren autenticación. Las excepciones públicas son `/health`, `/auth/login`, `/auth/forgot-password` y `/auth/reset-password`.
+Todos los endpoints de `/users`, `/profiles`, `/suppliers`, `/inventory` e incidencias requieren autenticación, salvo `POST /users` (registro público). Las otras excepciones públicas son `/health`, `/auth/login`, `/auth/forgot-password` y `/auth/reset-password`.
 
 La clave de firma se lee desde `JWT_SECRET`; la expiración se configura con `ACCESS_TOKEN_EXPIRE_MINUTES` (se conserva `ACCESS_TOKEN_MINUTES` como alias compatible). Los JWT llevan el ID de documento TinyDB en `sub`. Las cuentas legacy se migran al autenticarse: `password_hash` pasa a `hashed_password` y `name` se mueve a su perfil. Las credenciales y perfiles no se guardan en PostgreSQL/Supabase.
 
@@ -109,6 +109,16 @@ El seeder usa la misma tabla TinyDB `suppliers`, evita duplicados por nombre e i
 La recuperación devuelve la misma respuesta tanto si la cuenta existe como si no. Los tokens se guardan hasheados, vencen en 30 minutos y solo se aceptan una vez. El correo se envía a la cuenta interna; no se usa `customer_email` para recuperación.
 
 ## Pruebas
+
+### Manejo de errores
+
+Los handlers capturan fallos dentro de cada operación con `operation_errors`. Los errores de negocio conservan su estado HTTP; conflictos de integridad responden `400`, fallos SQL `503` y errores inesperados `500`, con JSON estructurado. Las transacciones fallidas hacen rollback.
+
+El manejador global queda como última protección. Validación y logs no incluyen entradas del usuario, tracebacks, texto de excepciones ni credenciales. Las rutas de validación conservan `400` o `422` según el contrato existente y los registros ausentes conservan `404`.
+
+Resend usa el timeout de 30 segundos del transporte instalado. El fallo de envío se sanea y la recuperación mantiene una respuesta genérica para no revelar cuentas; el token fallido se invalida.
+
+Las pruebas de errores usan almacenamiento y envío simulados, sin escribir en Supabase ni enviar correos reales. Cubren respuesta HTTP, rollback, privacidad y códigos de salida de scripts.
 
 ```bash
 python -m unittest discover -s tests

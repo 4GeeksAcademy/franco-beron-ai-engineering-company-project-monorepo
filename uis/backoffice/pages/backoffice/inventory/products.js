@@ -149,7 +149,8 @@ export default function InventoryProductsPage() {
                     </td>
                     <td>
                       <span className="inventory-category">
-                        {product.category.replaceAll("_", " ")}
+                        {product.category?.replaceAll("_", " ") ??
+                          "Sin categoría"}
                       </span>
                     </td>
                     <td>{product.office}</td>

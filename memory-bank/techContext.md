@@ -1,5 +1,12 @@
 # Technical Context — Monorepo Nexova
 
+## Auditoría de errores
+
+- Los handlers de FastAPI usan `app/error_handling.py` para capturar errores por operación y revertir transacciones SQL fallidas. Se mantienen rutas, autenticación, esquemas y códigos de negocio.
+- Los clientes de datos del backoffice comparten mensajes seguros y validación de respuestas en `lib/api-errors.js`; fetch usa timeout de 15 segundos. Resend conserva el timeout de 30 segundos de su transporte instalado.
+- Regresiones de clientes: `cd uis/backoffice && node --experimental-default-type=module --test lib/api-errors.test.mjs`.
+- Build de backoffice: `npx next build` (no existe script npm `build`). Backend: `cd services/support-api && uv run python -m unittest discover -s tests`.
+
 ## Estado técnico real del repositorio
 
 - Repositorio monorepo base de AI Engineering (4Geeks Academy).

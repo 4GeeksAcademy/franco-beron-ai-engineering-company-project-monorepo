@@ -24,9 +24,12 @@ export default function InboundOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let current = true;
+    setProductsStatus("loading");
+    setProductsError("");
     getProducts()
       .then((items) => {
         if (!current) return;
@@ -43,7 +46,7 @@ export default function InboundOrderPage() {
     return () => {
       current = false;
     };
-  }, []);
+  }, [reload]);
 
   useEffect(() => {
     if (!router.isReady || !router.query.asset_id) return;
@@ -118,6 +121,13 @@ export default function InboundOrderPage() {
           {productsStatus === "error" && (
             <p className="inventory-alert inventory-alert-error" role="alert">
               {productsError}
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setReload((value) => value + 1)}
+              >
+                {icon("refresh-cw")} Reintentar
+              </button>
             </p>
           )}
           {productsStatus === "ready" && products.length === 0 && (

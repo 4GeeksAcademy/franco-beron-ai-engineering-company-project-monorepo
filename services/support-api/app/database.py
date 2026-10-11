@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.config import SUPABASE_DATABASE_URL
+from app.error_handling import operation_errors
 
 
 def _sqlalchemy_url(database_url: str) -> str:
@@ -29,11 +30,12 @@ def get_db() -> Iterator[Session]:
     if engine is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SUPABASE_DATABASE_URL no está configurada.",
+            detail="El inventario no está disponible. Contacta con el administrador o inténtalo más tarde.",
         )
 
     with Session(engine) as session:
-        yield session
+        with operation_errors(session):
+            yield session
 
 
 def initialize_inventory_database() -> None:
