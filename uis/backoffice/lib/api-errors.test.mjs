@@ -5,7 +5,7 @@ import { getSuppliers } from "./suppliers.js";
 import { getIncidents } from "./incidents.js";
 
 globalThis.window = {
-  sessionStorage: { getItem: () => "test-token", removeItem: () => {} },
+  localStorage: { getItem: () => "test-token", removeItem: () => {} },
   location: { pathname: "/", search: "", assign: () => {} },
 };
 
