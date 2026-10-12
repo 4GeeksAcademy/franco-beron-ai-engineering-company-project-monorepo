@@ -24,3 +24,8 @@ seed = "seed:main"
 
 [tool.setuptools]
 py-modules = ["seed"]
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.1.0",
+]
