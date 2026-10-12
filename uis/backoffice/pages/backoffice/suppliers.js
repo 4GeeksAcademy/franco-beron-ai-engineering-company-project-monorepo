@@ -512,7 +512,11 @@ export default function SuppliersPage() {
                           : ""
                       }
                     >
-                      <th scope="row" className="supplier-name-cell">
+                      <th
+                        scope="row"
+                        className="supplier-name-cell"
+                        data-label="Proveedor"
+                      >
                         <strong>{supplier.name}</strong>
                         {supplier.contact_email && (
                           <a href={`mailto:${supplier.contact_email}`}>
@@ -520,8 +524,8 @@ export default function SuppliersPage() {
                           </a>
                         )}
                       </th>
-                      <td>{supplier.country}</td>
-                      <td>
+                      <td data-label="País">{supplier.country}</td>
+                      <td data-label="Categorías">
                         <div className="supplier-category-list">
                           {(supplier.categories ?? []).map((category) => (
                             <span
@@ -533,7 +537,7 @@ export default function SuppliersPage() {
                           ))}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Tarifa mensual">
                         {editing ? (
                           <form
                             className="supplier-rate-edit"
@@ -602,14 +606,14 @@ export default function SuppliersPage() {
                           </div>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Renovación">
                         <span className={`renewal-label ${renewal.tone}`}>
                           {renewal.tone === "renewal-soon" &&
                             icon("triangle-alert")}
                           {renewal.label}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         <span
                           className={`supplier-status supplier-status-${supplier.status}`}
                         >
@@ -619,7 +623,7 @@ export default function SuppliersPage() {
                             : "Suspendido"}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Acciones">
                         <button
                           className={`supplier-status-action ${supplier.status === "active" ? "action-suspend" : "action-activate"}`}
                           type="button"
