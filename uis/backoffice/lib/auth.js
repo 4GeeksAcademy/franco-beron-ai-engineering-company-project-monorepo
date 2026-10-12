@@ -175,3 +175,106 @@ export async function updateProfile(changes, token) {
 
   return payload;
 }
+
+/**
+ * POST /auth/forgot-password — request a password reset link.
+ * Returns { message } and always resolves successfully (the API never
+ * reveals whether the address is registered).
+ */
+export async function forgotPassword(email) {
+  const response = await fetch(`${API_BASE}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      response.status === 400 || response.status === 422
+        ? "Revisa el correo indicado e inténtalo de nuevo."
+        : "No se pudo completar la solicitud. Inténtalo de nuevo en unos momentos.",
+    );
+  }
+
+  return (
+    payload ?? {
+      message:
+        "Si esa dirección está registrada, recibirás un enlace en breve.",
+    }
+  );
+}
+
+/**
+ * POST /auth/reset-password — set a new password with a reset token.
+ * Returns { message } on success, throws on invalid/expired tokens.
+ */
+export async function resetPassword({ token, new_password }) {
+  const response = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      response.status === 400 || response.status === 422
+        ? payload?.detail ||
+          "El enlace de recuperación no es válido o ha expirado."
+        : "No se pudo restablecer la contraseña. Inténtalo de nuevo.";
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload ?? { message: "La contraseña se actualizó correctamente." };
+}
+
+/**
+ * POST /auth/change-password — update the password for the current session.
+ * Requires a valid token; verifies the current password server-side.
+ * Returns { message } on success.
+ */
+export async function changePassword(
+  { current_password, new_password },
+  token,
+) {
+  const authToken = token ?? getToken();
+  if (!authToken) {
+    redirectToLogin();
+    throw new Error("No autenticado.");
+  }
+
+  const response = await fetch(`${API_BASE}/auth/change-password`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${authToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ current_password, new_password }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      redirectToLogin();
+      throw new Error("La sesión terminó. Inicia sesión nuevamente.");
+    }
+    const message =
+      response.status === 400 || response.status === 422
+        ? payload?.detail || "Revisa los datos indicados e inténtalo de nuevo."
+        : "No se pudo cambiar la contraseña. Inténtalo de nuevo.";
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload ?? { message: "La contraseña se actualizó correctamente." };
+}

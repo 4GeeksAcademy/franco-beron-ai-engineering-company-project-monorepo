@@ -55,14 +55,18 @@ Abrir `http://127.0.0.1:3001/`.
 
 Flujo completo de autenticación en el frontend:
 
-| Ruta               | Uso                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------ |
-| `/login`           | Inicio de sesión; guarda el token en `localStorage` y redirige a la vista de retorno.      |
-| `/register`        | Alta de cuenta pública; valida en cliente, crea el usuario y hace login automático.        |
-| `/account/profile` | Consulta y edición del perfil propio (nombre, teléfono, dirección) vía `PUT /profiles/me`. |
+| Ruta                       | Uso                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------ |
+| `/login`                   | Inicio de sesión; guarda el token en `localStorage` y redirige a la vista de retorno.      |
+| `/register`                | Alta de cuenta pública; valida en cliente, crea el usuario y hace login automático.        |
+| `/forgot-password`         | Solicita un enlace de recuperación de contraseña (público).                                |
+| `/reset-password`          | Establece una nueva contraseña con el token del query string (público).                    |
+| `/account/profile`         | Consulta y edición del perfil propio (nombre, teléfono, dirección) vía `PUT /profiles/me`. |
+| `/account/change-password` | Cambio de contraseña autenticado; valida la actual y la nueva (confirmación en cliente).   |
 
-- La utilidad compartida es `lib/auth.js`: `getToken`, `setToken`, `clearToken`, `isAuthenticated`, `redirectToLogin`, `login`, `register`, `getCurrentUser` y `updateProfile`.
-- Todas las rutas del panel (excepto `/login` y `/register`) verifican la sesión con `/auth/me` y redirigen a `/login?next=...` si no hay token válido.
+- La utilidad compartida es `lib/auth.js`: `getToken`, `setToken`, `clearToken`, `isAuthenticated`, `redirectToLogin`, `login`, `register`, `getCurrentUser`, `updateProfile`, `forgotPassword`, `resetPassword` y `changePassword`.
+- El enlace de recuperación que envía la API apunta a `/reset-password?token=<token>` en el backoffice (`FRONTEND_URL`).
+- Las rutas `/forgot-password` y `/reset-password` son públicas; el resto del panel (excepto `/login` y `/register`) verifica la sesión con `/auth/me` y redirige a `/login?next=...` si no hay token válido.
 - Un `401` de la API limpia el token y redirige a `/login`.
 - El cierre de sesión limpia `localStorage` y vuelve a `/login`.
 - El sitio público (`uis/website/`) queda intacto y no requiere autenticación.
