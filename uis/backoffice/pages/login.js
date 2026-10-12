@@ -11,12 +11,25 @@ function icon(name) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { next } = router.query;
+  const { next, reset, changed } = router.query;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+
+  /* Show success messages passed by /reset-password or /account/change-password. */
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (typeof reset === "string" && reset === "success") {
+      setNotice(
+        "Contraseña actualizada. Inicia sesión con tu nueva contraseña.",
+      );
+    } else if (typeof changed === "string" && changed === "success") {
+      setNotice("Contraseña actualizada. Inicia sesión nuevamente.");
+    }
+  }, [router.isReady, reset, changed]);
 
   /* If already authenticated, redirect immediately. */
   useEffect(() => {
@@ -30,6 +43,7 @@ export default function LoginPage() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
 
     try {
@@ -99,16 +113,26 @@ export default function LoginPage() {
           </form>
 
           <div className="auth-links">
+            <Link className="text-button" href="/forgot-password">
+              {icon("key-round")}
+              <span>¿Olvidaste tu contraseña?</span>
+            </Link>
             <Link className="text-button" href="/register">
               {icon("user-plus")}
               <span>Crear cuenta</span>
             </Link>
           </div>
 
-          {error && (
-            <p className="form-message error-message" role="status">
-              {error}
+          {notice ? (
+            <p className="form-message success-message" role="status">
+              {notice}
             </p>
+          ) : (
+            error && (
+              <p className="form-message error-message" role="status">
+                {error}
+              </p>
+            )
           )}
         </div>
       </main>

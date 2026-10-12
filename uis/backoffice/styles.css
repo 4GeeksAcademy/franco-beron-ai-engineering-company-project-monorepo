@@ -1228,7 +1228,9 @@ h4 {
 }
 .auth-links {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 4px 14px;
   margin-top: 8px;
 }
 .back-link {

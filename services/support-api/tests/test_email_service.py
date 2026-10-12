@@ -18,7 +18,7 @@ class EmailServiceTests(unittest.TestCase):
         self.assertEqual(message["from"], "Nexova Ops")
         self.assertEqual(message["to"], [""])
         self.assertIn(
-            "http://localhost:4174/?reset_token=reset-token-value",
+            "http://localhost:4174/reset-password?token=reset-token-value",
             message["html"],
         )
 
