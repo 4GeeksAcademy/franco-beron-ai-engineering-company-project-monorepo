@@ -73,6 +73,7 @@ export default function InventoryShell({
     error: "",
   });
   const [retry, setRetry] = useState(0);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     if (!router.isReady) return undefined;
@@ -114,7 +115,26 @@ export default function InventoryShell({
 
   useEffect(() => {
     window.lucide?.createIcons({ attrs: { "stroke-width": 1.8 } });
-  }, [auth.status, active, children]);
+  }, [auth.status, active, children, navOpen]);
+
+  // Close the mobile drawer on route change and lock scroll while open.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [router.asPath]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("nav-open", navOpen);
+    if (navOpen) {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        root.classList.remove("nav-open");
+        document.body.style.overflow = previousOverflow;
+      };
+    }
+    return () => root.classList.remove("nav-open");
+  }, [navOpen]);
 
   function logout() {
     clearToken();
@@ -156,44 +176,66 @@ export default function InventoryShell({
       </Head>
       <div className="layout inventory-layout">
         <aside className="sidebar">
-          <Link className="brand-lockup inventory-brand" href="/">
-            <span className="brand-mark">N</span>
-            <span className="brand-name">
-              <strong>Nexova</strong>
-              <span>Inventario</span>
-            </span>
-          </Link>
-          <nav aria-label="Navegación de inventario">
-            {navigation.map((item) => (
-              <Link
-                className={`nav-link ${active === item.id ? "active" : ""}`}
-                href={item.href}
-                key={item.id}
-                aria-current={active === item.id ? "page" : undefined}
-                title={item.label}
-              >
-                {icon(item.icon)}
-                <span>{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-          <div className="sidebar-footer inventory-sidebar-footer">
-            <div className="sidebar-user">
-              <span className="avatar">
-                {(auth.user?.name || auth.user?.email || "N")
-                  .slice(0, 1)
-                  .toUpperCase()}
+          <div className="sidebar-topbar">
+            <Link className="brand-lockup inventory-brand" href="/">
+              <span className="brand-mark">N</span>
+              <span className="brand-name">
+                <strong>Nexova</strong>
+                <span>Inventario</span>
               </span>
-              <div>
-                <strong>{auth.user?.name || "Usuario interno"}</strong>
-                <span>{auth.user?.email || ""}</span>
-              </div>
-            </div>
-            <button className="sidebar-logout" type="button" onClick={logout}>
-              {icon("log-out")}
-              <span>Cerrar sesión</span>
+            </Link>
+            <button
+              className="nav-toggle"
+              type="button"
+              onClick={() => setNavOpen((value) => !value)}
+              aria-expanded={navOpen}
+              aria-controls="inventory-nav"
+              aria-label={navOpen ? "Cerrar menú" : "Abrir menú"}
+            >
+              <i data-lucide={navOpen ? "x" : "menu"} aria-hidden="true" />
             </button>
           </div>
+          <div className="sidebar-drawer">
+            <nav id="inventory-nav" aria-label="Navegación de inventario">
+              {navigation.map((item) => (
+                <Link
+                  className={`nav-link ${active === item.id ? "active" : ""}`}
+                  href={item.href}
+                  key={item.id}
+                  aria-current={active === item.id ? "page" : undefined}
+                  title={item.label}
+                >
+                  {icon(item.icon)}
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+            <div className="sidebar-footer inventory-sidebar-footer">
+              <div className="sidebar-user">
+                <span className="avatar">
+                  {(auth.user?.name || auth.user?.email || "N")
+                    .slice(0, 1)
+                    .toUpperCase()}
+                </span>
+                <div>
+                  <strong>{auth.user?.name || "Usuario interno"}</strong>
+                  <span>{auth.user?.email || ""}</span>
+                </div>
+              </div>
+              <button className="sidebar-logout" type="button" onClick={logout}>
+                {icon("log-out")}
+                <span>Cerrar sesión</span>
+              </button>
+            </div>
+          </div>
+          {navOpen && (
+            <button
+              className="nav-backdrop"
+              type="button"
+              aria-label="Cerrar menú"
+              onClick={() => setNavOpen(false)}
+            />
+          )}
         </aside>
 
         <main className="content inventory-content">

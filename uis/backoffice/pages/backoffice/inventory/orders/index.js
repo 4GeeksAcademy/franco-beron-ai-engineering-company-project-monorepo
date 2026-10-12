@@ -119,7 +119,7 @@ export default function InventoryOrdersPage() {
                   const inbound = order.order_type === "inbound";
                   return (
                     <tr key={`${order.order_type}-${order.id}`}>
-                      <td>
+                      <td data-label="Movimiento">
                         <span
                           className={`order-type ${inbound ? "order-inbound" : "order-outbound"}`}
                         >
@@ -138,17 +138,21 @@ export default function InventoryOrdersPage() {
                               : "Consumo"}
                         </span>
                       </td>
-                      <th scope="row" className="asset-name">
+                      <th
+                        scope="row"
+                        className="asset-name"
+                        data-label="Activo"
+                      >
                         {order.asset_name}
                         <small>{order.asset_sku}</small>
                       </th>
-                      <td className="quantity-cell">
+                      <td className="quantity-cell" data-label="Cantidad">
                         {inbound ? "+" : "−"}
                         {order.quantity}
                       </td>
-                      <td>{order.office}</td>
-                      <td>{formatDate(order.created_at)}</td>
-                      <td>
+                      <td data-label="Oficina">{order.office}</td>
+                      <td data-label="Fecha">{formatDate(order.created_at)}</td>
+                      <td data-label="Registrado por">
                         <code className="user-uuid" title={order.user_uuid}>
                           {order.user_uuid}
                         </code>

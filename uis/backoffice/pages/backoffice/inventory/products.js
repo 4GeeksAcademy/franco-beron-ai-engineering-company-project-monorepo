@@ -141,26 +141,26 @@ export default function InventoryProductsPage() {
               <tbody>
                 {products.map((product) => (
                   <tr key={product.id}>
-                    <th scope="row" className="asset-name">
+                    <th scope="row" className="asset-name" data-label="Activo">
                       {product.name}
                     </th>
-                    <td>
+                    <td data-label="SKU">
                       <code>{product.sku}</code>
                     </td>
-                    <td>
+                    <td data-label="Categoría">
                       <span className="inventory-category">
                         {product.category?.replaceAll("_", " ") ??
                           "Sin categoría"}
                       </span>
                     </td>
-                    <td>{product.office}</td>
-                    <td>
+                    <td data-label="Oficina">{product.office}</td>
+                    <td data-label="Stock actual">
                       <div className="stock-cell">
                         <strong>{product.current_stock}</strong>
                         <StockStatus quantity={product.current_stock} />
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Acciones">
                       <div className="row-actions">
                         <Link
                           className="icon-button"
