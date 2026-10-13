@@ -206,21 +206,23 @@ _(Ninguno hasta el momento. Los tests existentes ya habían validado el flujo de
 
 ---
 
-## Tests del frontend (TypeScript/Jest) — Actividad extra
+## Tests del frontend (Node — `node:test`)
 
-Actualmente el frontend tiene un archivo de prueba (`lib/api-errors.test.mjs`) usando el módulo `node:test` nativo. Para mantener consistencia, se amplió ese mismo enfoque:
+Se mantiene el estilo existente del proyecto (`node --test`). Archivo de pruebas ubicado en `uis/backoffice/tests/api-errors.test.mjs`.
 
-**Funciones cubiertas:**
+**Funciones cubiertas (3 funciones, 18 tests):**
 
-- `apiErrorMessage` en `lib/api-errors.js` — todos los códigos HTTP
-- `readApiResponse` en `lib/api-errors.js` — parseo de respuestas
-- `getToken/setToken/clearToken` en `lib/auth.js` — helpers de localStorage
+| Función                        |             Happy              |                            Failure                            | Tests |
+| ------------------------------ | :----------------------------: | :-----------------------------------------------------------: | :---: |
+| `apiErrorMessage`              |     ✅ 401/403/404/400/422     |               ✅ código desconocido + undefined               |   6   |
+| `readApiResponse`              |   ✅ JSON object + 204 null    | ✅ no-ok 401/404, JSON inválido, payload null, payload string |   7   |
+| `getToken/setToken/clearToken` | ✅ set+get, clear, sobrescribe |                         ✅ sin window                         |   5   |
 
 Para ejecutar:
 
 ```bash
 cd uis/backoffice
-node --test lib/api-errors.test.mjs
+node --test tests/api-errors.test.mjs
 ```
 
-_(Los tests de frontend se mantienen en el estilo existente del proyecto.)_
+> **Nota:** Se eligió `node:test` en lugar de Jest para mantener consistencia con el único test existente del proyecto (`lib/api-errors.test.mjs`). Jest requeriría Babel para transformar los ES Modules que usa el frontend.
