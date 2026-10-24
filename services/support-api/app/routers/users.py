@@ -2,14 +2,16 @@ from app.error_handling import operation_errors
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth import get_current_user, require_admin
-from app.schemas import ManagedUserPublic, UserCreate, UserUpdate
+from app.schemas import ManagedUserPublic, RegisterResponse, UserCreate, UserUpdate
 from app.user_service import (
     create_user,
     delete_user,
     get_user_by_id,
+    normalize_user_record,
     public_user,
     update_user,
     users,
+    ensure_profile,
 )
 
 
@@ -27,12 +29,12 @@ def ensure_can_manage(target_user_id: int, current_user):
         )
 
 
-@router.post("", response_model=ManagedUserPublic, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register_user(
     payload: UserCreate,
 ):
     with operation_errors():
-        user, _ = create_user(
+        user, profile = create_user(
             str(payload.email),
             payload.password,
             {
@@ -41,7 +43,13 @@ def register_user(
                 "address": payload.address,
             },
         )
-        return public_user(user)
+        return {
+            "id": user.doc_id,
+            "name": profile.get("name") if profile else None,
+            "role": user.get("role", "user"),
+            "is_active": user.get("is_active", True),
+            "created_at": user["created_at"],
+        }
 
 
 @router.get("", response_model=list[ManagedUserPublic])

@@ -138,7 +138,6 @@ def public_user(user) -> dict:
     profile = ensure_profile(user.doc_id)
     return {
         "id": user.doc_id,
-        "email": user["email"],
         "name": profile.get("name") or "",
         "role": user.get("role", "user"),
     }
