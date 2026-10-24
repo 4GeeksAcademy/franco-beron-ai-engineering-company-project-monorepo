@@ -7,6 +7,7 @@ import {
   updateSupplierRate,
   updateSupplierStatus,
 } from "../../lib/suppliers";
+import Icon from "../../components/Icon";
 
 const CATEGORIES = [
   ["job_boards", "Portales de empleo"],
@@ -30,10 +31,6 @@ const EMPTY_FORM = {
   contact_email: "",
   notes: "",
 };
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
 
 function categoryLabel(value) {
   return CATEGORIES.find(([category]) => category === value)?.[1] ?? value;
@@ -258,7 +255,7 @@ export default function SuppliersPage() {
             onClick={() => void reloadSuppliers()}
             disabled={loadState === "loading"}
           >
-            {icon("refresh-cw")}
+            <Icon name="refresh-cw" />
             <span>Actualizar</span>
           </button>
           <button
@@ -270,7 +267,7 @@ export default function SuppliersPage() {
               setFormSuccess("");
             }}
           >
-            {icon(formOpen ? "x" : "plus")}
+            {formOpen ? <Icon name="x" /> : <Icon name="plus" />}
             <span>{formOpen ? "Cerrar" : "Nuevo proveedor"}</span>
           </button>
         </div>
@@ -406,7 +403,7 @@ export default function SuppliersPage() {
                 type="submit"
                 disabled={saving}
               >
-                {icon(saving ? "loader-circle" : "save")}
+                {saving ? <Icon name="loader-circle" /> : <Icon name="save" />}
                 <span>{saving ? "Guardando..." : "Guardar proveedor"}</span>
               </button>
             </div>
@@ -472,7 +469,7 @@ export default function SuppliersPage() {
               type="button"
               onClick={() => void reloadSuppliers()}
             >
-              {icon("refresh-cw")}
+              <Icon name="refresh-cw" />
               <span>Reintentar</span>
             </button>
           </div>
@@ -564,10 +561,10 @@ export default function SuppliersPage() {
                               aria-label="Guardar tarifa"
                               title="Guardar tarifa"
                             >
-                              {icon(
-                                savingRateId === supplier.id
-                                  ? "loader-circle"
-                                  : "check",
+                              {savingRateId === supplier.id ? (
+                                <Icon name="loader-circle" />
+                              ) : (
+                                <Icon name="check" />
                               )}
                             </button>
                             <button
@@ -577,7 +574,7 @@ export default function SuppliersPage() {
                               aria-label="Cancelar edición"
                               title="Cancelar"
                             >
-                              {icon("x")}
+                              <Icon name="x" />
                             </button>
                           </form>
                         ) : (
@@ -601,7 +598,7 @@ export default function SuppliersPage() {
                               aria-label={`Editar tarifa de ${supplier.name}`}
                               title="Editar tarifa"
                             >
-                              {icon("pencil")}
+                              <Icon name="pencil" />
                             </button>
                           </div>
                         )}

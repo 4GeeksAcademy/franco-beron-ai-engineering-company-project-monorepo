@@ -4,10 +4,7 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 
 import { resetPassword } from "../lib/auth";
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
+import Icon from "../components/Icon";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -86,7 +83,7 @@ export default function ResetPasswordPage() {
                 </p>
               </div>
               <Link className="text-button back-link" href="/forgot-password">
-                {icon("arrow-left")}
+                <Icon name="arrow-left" />
                 <span>Solicitar un nuevo enlace</span>
               </Link>
             </>
@@ -94,7 +91,7 @@ export default function ResetPasswordPage() {
             <form className="form-stack" onSubmit={handleSubmit}>
               <label htmlFor="reset-password">Contraseña nueva</label>
               <div className="input-shell">
-                {icon("lock-keyhole")}
+                <Icon name="lock-keyhole" />
                 <input
                   id="reset-password"
                   name="new_password"
@@ -110,7 +107,7 @@ export default function ResetPasswordPage() {
 
               <label htmlFor="reset-confirm">Repetir contraseña</label>
               <div className="input-shell">
-                {icon("shield-check")}
+                <Icon name="shield-check" />
                 <input
                   id="reset-confirm"
                   name="confirm_password"
@@ -130,7 +127,7 @@ export default function ResetPasswordPage() {
                 type="submit"
                 disabled={loading}
               >
-                {icon("key-round")}
+                <Icon name="key-round" />
                 <span>
                   {loading ? "Actualizando…" : "Actualizar contraseña"}
                 </span>
@@ -142,7 +139,7 @@ export default function ResetPasswordPage() {
                 <p className="form-message error-message">{error}</p>
               </div>
               <Link className="text-button back-link" href="/forgot-password">
-                {icon("arrow-left")}
+                <Icon name="arrow-left" />
                 <span>Solicitar un nuevo enlace</span>
               </Link>
             </>

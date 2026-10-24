@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import InventoryShell from "../../components/InventoryShell";
+import Icon from "../../components/Icon";
 import {
   createIncident,
   getIncidentSummary,
@@ -239,7 +240,7 @@ export default function IncidentsPage() {
           </div>
           {summaryState === "loading" && (
             <p className="incident-feedback" role="status">
-              {icon("loader-circle", "spin")} Cargando métricas…
+              <Icon name="loader-circle" className="spin" /> Cargando métricas…
             </p>
           )}
           {summaryState === "error" && (
@@ -253,7 +254,7 @@ export default function IncidentsPage() {
                 type="button"
                 onClick={() => setSummaryRevision((value) => value + 1)}
               >
-                {icon("refresh-cw")} Reintentar
+                <Icon name="refresh-cw" /> Reintentar
               </button>
             </div>
           )}
@@ -274,7 +275,9 @@ export default function IncidentsPage() {
         <div className="incident-workspace">
           <section className="panel incident-form-panel">
             <div className="panel-heading">
-              <span className="section-icon">{icon("square-pen")}</span>
+              <span className="section-icon">
+                <Icon name="square-pen" />
+              </span>
               <div>
                 <p className="kicker">Registro</p>
                 <h2>Nueva incidencia</h2>
@@ -385,7 +388,11 @@ export default function IncidentsPage() {
                 type="submit"
                 disabled={saving}
               >
-                {icon(saving ? "loader-circle" : "plus", saving ? "spin" : "")}
+                {saving ? (
+                  <Icon name="loader-circle" className="spin" />
+                ) : (
+                  <Icon name="plus" />
+                )}
                 <span>{saving ? "Registrando…" : "Registrar incidencia"}</span>
               </button>
               {formError && (
@@ -414,7 +421,7 @@ export default function IncidentsPage() {
                 title="Actualizar incidencias"
                 onClick={() => setListRevision((value) => value + 1)}
               >
-                {icon("refresh-cw")}
+                <Icon name="refresh-cw" />
               </button>
             </div>
             <div className="incident-filters">
@@ -454,7 +461,8 @@ export default function IncidentsPage() {
             </div>
             {listState === "loading" && (
               <div className="incident-empty" role="status">
-                {icon("loader-circle", "spin")} Cargando incidencias…
+                <Icon name="loader-circle" className="spin" /> Cargando
+                incidencias…
               </div>
             )}
             {listState === "error" && (
@@ -468,13 +476,13 @@ export default function IncidentsPage() {
                   type="button"
                   onClick={() => setListRevision((value) => value + 1)}
                 >
-                  {icon("refresh-cw")} Reintentar
+                  <Icon name="refresh-cw" /> Reintentar
                 </button>
               </div>
             )}
             {listState === "ready" && incidents.length === 0 && (
               <div className="incident-empty">
-                {icon("inbox")}
+                <Icon name="inbox" />
                 <strong>
                   {Object.values(filters).some(Boolean)
                     ? "No hay resultados para estos filtros"

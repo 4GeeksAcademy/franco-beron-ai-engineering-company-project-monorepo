@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
 import { login, setToken, isAuthenticated } from "../lib/auth";
+import Icon from "../components/Icon";
 
 function icon(name) {
   return <i data-lucide={name} aria-hidden="true" />;
@@ -80,7 +81,7 @@ export default function LoginPage() {
           <form className="form-stack" onSubmit={handleSubmit}>
             <label htmlFor="login-email">Correo interno</label>
             <div className="input-shell">
-              {icon("mail")}
+              <Icon name="mail" />
               <input
                 id="login-email"
                 name="email"
@@ -94,7 +95,7 @@ export default function LoginPage() {
 
             <label htmlFor="login-password">Contraseña</label>
             <div className="input-shell">
-              {icon("lock-keyhole")}
+              <Icon name="lock-keyhole" />
               <input
                 id="login-password"
                 name="password"
@@ -107,18 +108,18 @@ export default function LoginPage() {
             </div>
 
             <button className="primary-button" type="submit" disabled={loading}>
-              {icon("log-in")}
+              <Icon name="log-in" />
               <span>{loading ? "Iniciando sesión…" : "Iniciar sesión"}</span>
             </button>
           </form>
 
           <div className="auth-links">
             <Link className="text-button" href="/forgot-password">
-              {icon("key-round")}
+              <Icon name="key-round" />
               <span>¿Olvidaste tu contraseña?</span>
             </Link>
             <Link className="text-button" href="/register">
-              {icon("user-plus")}
+              <Icon name="user-plus" />
               <span>Crear cuenta</span>
             </Link>
           </div>

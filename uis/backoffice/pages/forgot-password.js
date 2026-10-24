@@ -3,10 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { forgotPassword } from "../lib/auth";
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
+import Icon from "../components/Icon";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -58,7 +55,7 @@ export default function ForgotPasswordPage() {
           <form className="form-stack" onSubmit={handleSubmit}>
             <label htmlFor="forgot-email">Correo interno</label>
             <div className="input-shell">
-              {icon("mail")}
+              <Icon name="mail" />
               <input
                 id="forgot-email"
                 name="email"
@@ -76,7 +73,7 @@ export default function ForgotPasswordPage() {
               type="submit"
               disabled={loading || submitted}
             >
-              {icon("send")}
+              <Icon name="send" />
               <span>
                 {loading
                   ? "Enviando…"
@@ -88,7 +85,7 @@ export default function ForgotPasswordPage() {
           </form>
 
           <Link className="text-button back-link" href="/login">
-            {icon("arrow-left")}
+            <Icon name="arrow-left" />
             <span>Volver al acceso</span>
           </Link>
 

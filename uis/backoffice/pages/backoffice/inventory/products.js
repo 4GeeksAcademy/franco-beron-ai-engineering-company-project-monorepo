@@ -3,30 +3,27 @@ import { useEffect, useState } from "react";
 
 import InventoryShell from "../../../components/InventoryShell";
 import { getProducts } from "../../../lib/inventory";
+import Icon from "../../../components/Icon";
 
 // Menos de cinco unidades indica stock bajo; cero unidades indica agotado.
 const LOW_STOCK_THRESHOLD = 5;
 
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
-
 function StockStatus({ quantity }) {
   if (quantity === 0) {
     return (
-      <span className="stock-badge stock-empty">{icon("circle-x")}Agotado</span>
+      <span className="stock-badge stock-empty"><Icon name="circle-x" />Agotado</span>
     );
   }
   if (quantity < LOW_STOCK_THRESHOLD) {
     return (
       <span className="stock-badge stock-low">
-        {icon("triangle-alert")}Stock bajo
+        <Icon name="triangle-alert" />Stock bajo
       </span>
     );
   }
   return (
     <span className="stock-badge stock-healthy">
-      {icon("circle-check")}Saludable
+      <Icon name="circle-check" />Saludable
     </span>
   );
 }
@@ -75,14 +72,14 @@ export default function InventoryProductsPage() {
             className="primary-button"
             href="/backoffice/inventory/orders/inbound"
           >
-            {icon("package-plus")}
+            <Icon name="package-plus" />
             <span>Registrar entrada</span>
           </Link>
           <Link
             className="secondary-button"
             href="/backoffice/inventory/orders/outbound"
           >
-            {icon("package-minus")}
+            <Icon name="package-minus" />
             <span>Registrar salida</span>
           </Link>
         </div>
@@ -102,7 +99,7 @@ export default function InventoryProductsPage() {
             type="button"
             onClick={loadProducts}
           >
-            {icon("refresh-cw")}
+            <Icon name="refresh-cw" />
             <span>Reintentar</span>
           </button>
         </div>
@@ -120,7 +117,7 @@ export default function InventoryProductsPage() {
           <div className="inventory-summary-line">
             <span>{products.length} activos</span>
             <span className="stock-legend">
-              {icon("triangle-alert")} {lowStockCount} con menos de{" "}
+              <Icon name="triangle-alert" /> {lowStockCount} con menos de{" "}
               {LOW_STOCK_THRESHOLD} unidades
             </span>
           </div>
@@ -168,7 +165,7 @@ export default function InventoryProductsPage() {
                           aria-label={`Registrar entrada de ${product.name}`}
                           title={`Registrar entrada de ${product.name}`}
                         >
-                          {icon("arrow-down-to-line")}
+                          <Icon name="arrow-down-to-line" />
                         </Link>
                         <Link
                           className="icon-button"
@@ -176,7 +173,7 @@ export default function InventoryProductsPage() {
                           aria-label={`Registrar salida de ${product.name}`}
                           title={`Registrar salida de ${product.name}`}
                         >
-                          {icon("arrow-up-from-line")}
+                          <Icon name="arrow-up-from-line" />
                         </Link>
                       </div>
                     </td>

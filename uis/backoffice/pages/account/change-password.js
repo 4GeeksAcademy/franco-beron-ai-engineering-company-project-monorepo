@@ -4,10 +4,7 @@ import { useState } from "react";
 
 import InventoryShell from "../../components/InventoryShell";
 import { changePassword, clearToken } from "../../lib/auth";
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
+import Icon from "../../components/Icon";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -77,7 +74,7 @@ export default function ChangePasswordPage() {
             <form className="form-stack profile-form" onSubmit={handleSubmit}>
               <label htmlFor="current-password">Contraseña actual</label>
               <div className="input-shell">
-                {icon("lock-keyhole")}
+                <Icon name="lock-keyhole" />
                 <input
                   id="current-password"
                   name="current_password"
@@ -95,7 +92,7 @@ export default function ChangePasswordPage() {
 
               <label htmlFor="new-password">Contraseña nueva</label>
               <div className="input-shell">
-                {icon("key-round")}
+                <Icon name="key-round" />
                 <input
                   id="new-password"
                   name="new_password"
@@ -115,7 +112,7 @@ export default function ChangePasswordPage() {
 
               <label htmlFor="confirm-password">Repetir contraseña nueva</label>
               <div className="input-shell">
-                {icon("shield-check")}
+                <Icon name="shield-check" />
                 <input
                   id="confirm-password"
                   name="confirm_password"
@@ -141,7 +138,7 @@ export default function ChangePasswordPage() {
                   type="submit"
                   disabled={saving}
                 >
-                  {icon("save")}
+                  <Icon name="save" />
                   <span>
                     {saving ? "Actualizando…" : "Actualizar contraseña"}
                   </span>

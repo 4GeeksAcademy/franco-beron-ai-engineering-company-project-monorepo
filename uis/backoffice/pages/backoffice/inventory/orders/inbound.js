@@ -3,10 +3,7 @@ import { useRouter } from "next/router";
 
 import InventoryShell from "../../../../components/InventoryShell";
 import { createInboundOrder, getProducts } from "../../../../lib/inventory";
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
+import Icon from "../../../../components/Icon";
 
 const emptyForm = {
   asset_id: "",
@@ -105,7 +102,7 @@ export default function InboundOrderPage() {
         <section className="inventory-form-section">
           <div className="inventory-section-heading">
             <span className="inventory-section-icon tone-teal">
-              {icon("package-plus")}
+              <Icon name="package-plus" />
             </span>
             <div>
               <p className="inventory-eyebrow">Movimiento de entrada</p>
@@ -126,7 +123,7 @@ export default function InboundOrderPage() {
                 type="button"
                 onClick={() => setReload((value) => value + 1)}
               >
-                {icon("refresh-cw")} Reintentar
+                <Icon name="refresh-cw" /> Reintentar
               </button>
             </p>
           )}
@@ -206,7 +203,11 @@ export default function InboundOrderPage() {
                   type="submit"
                   disabled={submitting}
                 >
-                  {icon(submitting ? "loader-circle" : "arrow-down-to-line")}
+                  {submitting ? (
+                    <Icon name="loader-circle" />
+                  ) : (
+                    <Icon name="arrow-down-to-line" />
+                  )}
                   <span>
                     {submitting ? "Guardando..." : "Registrar entrada"}
                   </span>
