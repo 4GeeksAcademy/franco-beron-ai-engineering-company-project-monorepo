@@ -6,11 +6,11 @@ import "../styles.css";
 
 export default function App({ Component, pageProps }) {
   useEffect(() => {
-    /* Ensure Lucide icons are re-created after each page render */
+    /* Only create Lucide icons once on mount — prevents reflow on every render */
     if (typeof window !== "undefined" && window.lucide) {
       window.lucide.createIcons({ attrs: { "stroke-width": 1.8 } });
     }
-  });
+  }, []);
 
   return (
     <>

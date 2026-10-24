@@ -3,10 +3,7 @@ import { useEffect, useState } from "react";
 
 import InventoryShell from "../../components/InventoryShell";
 import { getCurrentUser, updateProfile } from "../../lib/auth";
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
+import Icon from "../../components/Icon";
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
@@ -99,7 +96,7 @@ export default function ProfilePage() {
               <form className="form-stack profile-form" onSubmit={handleSave}>
                 <label htmlFor="profile-name">Nombre</label>
                 <div className="input-shell">
-                  {icon("user")}
+                  <Icon name="user" />
                   <input
                     id="profile-name"
                     name="name"
@@ -117,7 +114,7 @@ export default function ProfilePage() {
 
                 <label htmlFor="profile-phone">Teléfono</label>
                 <div className="input-shell">
-                  {icon("phone")}
+                  <Icon name="phone" />
                   <input
                     id="profile-phone"
                     name="phone"
@@ -135,7 +132,7 @@ export default function ProfilePage() {
 
                 <label htmlFor="profile-address">Dirección</label>
                 <div className="input-shell">
-                  {icon("map-pin")}
+                  <Icon name="map-pin" />
                   <input
                     id="profile-address"
                     name="address"
@@ -163,7 +160,7 @@ export default function ProfilePage() {
                       setSaveError("");
                     }}
                   >
-                    {icon("rotate-ccw")}
+                    <Icon name="rotate-ccw" />
                     <span>Restaurar</span>
                   </button>
                   <button
@@ -171,7 +168,7 @@ export default function ProfilePage() {
                     type="submit"
                     disabled={saving}
                   >
-                    {icon("save")}
+                    <Icon name="save" />
                     <span>{saving ? "Guardando…" : "Guardar cambios"}</span>
                   </button>
                 </div>

@@ -7,10 +7,7 @@ import {
   getProduct,
   getProducts,
 } from "../../../../lib/inventory";
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
+import Icon from "../../../../components/Icon";
 
 const emptyForm = {
   asset_id: "",
@@ -162,7 +159,7 @@ export default function OutboundOrderPage() {
         <section className="inventory-form-section">
           <div className="inventory-section-heading">
             <span className="inventory-section-icon tone-coral">
-              {icon("package-minus")}
+              <Icon name="package-minus" />
             </span>
             <div>
               <p className="inventory-eyebrow">Movimiento de salida</p>
@@ -183,7 +180,7 @@ export default function OutboundOrderPage() {
                 type="button"
                 onClick={() => setReload((value) => value + 1)}
               >
-                {icon("refresh-cw")} Reintentar
+                <Icon name="refresh-cw" /> Reintentar
               </button>
             </p>
           )}
@@ -226,7 +223,10 @@ export default function OutboundOrderPage() {
                   )}
                   {stockStatus === "ready" && (
                     <>
-                      <span>{icon("boxes")}Disponible ahora</span>
+                      <span>
+                        <Icon name="boxes" />
+                        Disponible ahora
+                      </span>
                       <strong>
                         {selectedAsset.current_stock} <small>unidades</small>
                       </strong>
@@ -240,7 +240,7 @@ export default function OutboundOrderPage() {
                         type="button"
                         onClick={() => setStockReload((value) => value + 1)}
                       >
-                        {icon("refresh-cw")} Reintentar
+                        <Icon name="refresh-cw" /> Reintentar
                       </button>
                     </span>
                   )}
@@ -272,8 +272,8 @@ export default function OutboundOrderPage() {
                     id="outbound-quantity-message"
                     role="alert"
                   >
-                    {icon("triangle-alert")} Solicitas {quantity} y solo hay{" "}
-                    {selectedAsset.current_stock} unidades disponibles.
+                    <Icon name="triangle-alert" /> Solicitas {quantity} y solo
+                    hay {selectedAsset.current_stock} unidades disponibles.
                   </p>
                 )}
                 {quantityError && !exceedsStock && (
@@ -341,7 +341,11 @@ export default function OutboundOrderPage() {
                     submitting || exceedsStock || stockStatus !== "ready"
                   }
                 >
-                  {icon(submitting ? "loader-circle" : "arrow-up-from-line")}
+                  {submitting ? (
+                    <Icon name="loader-circle" />
+                  ) : (
+                    <Icon name="arrow-up-from-line" />
+                  )}
                   <span>
                     {submitting ? "Guardando..." : "Registrar salida"}
                   </span>

@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 
 import InventoryShell from "../../../../components/InventoryShell";
 import { getOrders } from "../../../../lib/inventory";
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
+import Icon from "../../../../components/Icon";
 
 function formatDate(value) {
   const date = new Date(value);
@@ -57,7 +54,7 @@ export default function InventoryOrdersPage() {
           onClick={loadOrders}
           disabled={status === "loading"}
         >
-          {icon("refresh-cw")}
+          <Icon name="refresh-cw" />
           <span>Actualizar</span>
         </button>
       </div>
@@ -76,7 +73,7 @@ export default function InventoryOrdersPage() {
             type="button"
             onClick={loadOrders}
           >
-            {icon("refresh-cw")}
+            <Icon name="refresh-cw" />
             <span>Reintentar</span>
           </button>
         </div>
@@ -95,10 +92,10 @@ export default function InventoryOrdersPage() {
             <span>{orders.length} movimientos</span>
             <span className="history-legend">
               <span className="order-type order-inbound">
-                {icon("arrow-down-to-line")} Entrada
+                <Icon name="arrow-down-to-line" /> Entrada
               </span>
               <span className="order-type order-outbound">
-                {icon("arrow-up-from-line")} Salida
+                <Icon name="arrow-up-from-line" /> Salida
               </span>
             </span>
           </div>
@@ -123,10 +120,10 @@ export default function InventoryOrdersPage() {
                         <span
                           className={`order-type ${inbound ? "order-inbound" : "order-outbound"}`}
                         >
-                          {icon(
-                            inbound
-                              ? "arrow-down-to-line"
-                              : "arrow-up-from-line",
+                          {inbound ? (
+                            <Icon name="arrow-down-to-line" />
+                          ) : (
+                            <Icon name="arrow-up-from-line" />
                           )}
                           {inbound ? "Entrada" : "Salida"}
                         </span>

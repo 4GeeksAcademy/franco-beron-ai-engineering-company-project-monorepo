@@ -4,10 +4,7 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 
 import { login, register, setToken } from "../lib/auth";
-
-function icon(name) {
-  return <i data-lucide={name} aria-hidden="true" />;
-}
+import Icon from "../components/Icon";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -99,7 +96,7 @@ export default function RegisterPage() {
           <form className="form-stack" onSubmit={handleSubmit}>
             <label htmlFor="reg-email">Correo electrónico *</label>
             <div className="input-shell">
-              {icon("mail")}
+              <Icon name="mail" />
               <input
                 id="reg-email"
                 name="email"
@@ -116,7 +113,7 @@ export default function RegisterPage() {
 
             <label htmlFor="reg-password">Contraseña *</label>
             <div className="input-shell">
-              {icon("lock-keyhole")}
+              <Icon name="lock-keyhole" />
               <input
                 id="reg-password"
                 name="password"
@@ -134,7 +131,7 @@ export default function RegisterPage() {
 
             <label htmlFor="reg-confirm">Confirmar contraseña *</label>
             <div className="input-shell">
-              {icon("shield-check")}
+              <Icon name="shield-check" />
               <input
                 id="reg-confirm"
                 name="confirmPassword"
@@ -155,7 +152,7 @@ export default function RegisterPage() {
 
               <label htmlFor="reg-name">Nombre</label>
               <div className="input-shell">
-                {icon("user")}
+                <Icon name="user" />
                 <input
                   id="reg-name"
                   name="name"
@@ -169,7 +166,7 @@ export default function RegisterPage() {
 
               <label htmlFor="reg-phone">Teléfono</label>
               <div className="input-shell">
-                {icon("phone")}
+                <Icon name="phone" />
                 <input
                   id="reg-phone"
                   name="phone"
@@ -183,7 +180,7 @@ export default function RegisterPage() {
 
               <label htmlFor="reg-address">Dirección</label>
               <div className="input-shell">
-                {icon("map-pin")}
+                <Icon name="map-pin" />
                 <input
                   id="reg-address"
                   name="address"
@@ -197,14 +194,14 @@ export default function RegisterPage() {
             </fieldset>
 
             <button className="primary-button" type="submit" disabled={loading}>
-              {icon("user-plus")}
+              <Icon name="user-plus" />
               <span>{loading ? "Registrando…" : "Crear cuenta"}</span>
             </button>
           </form>
 
           <div className="auth-links">
             <Link className="text-button" href="/login">
-              {icon("arrow-left")}
+              <Icon name="arrow-left" />
               <span>Ya tengo cuenta</span>
             </Link>
           </div>
