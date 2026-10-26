@@ -125,9 +125,16 @@ class ManagedUserPublic(BaseModel):
 
 class LoginUserPublic(BaseModel):
     id: int
-    email: EmailStr
     name: str
     role: UserRole
+
+
+class RegisterResponse(BaseModel):
+    id: int
+    name: str | None
+    role: UserRole
+    is_active: bool
+    created_at: datetime
 
 
 class ProfilePublic(BaseModel):
@@ -388,7 +395,6 @@ class AssetEntryPublic(BaseModel):
     supplier: str
     office: Office
     created_at: datetime
-    user_uuid: str
 
 
 class AssetExitCreate(BaseModel):
@@ -419,7 +425,6 @@ class AssetExitPublic(BaseModel):
     assigned_to: str | None
     office: Office
     created_at: datetime
-    user_uuid: str
 
 
 class InventoryOrderPublic(BaseModel):

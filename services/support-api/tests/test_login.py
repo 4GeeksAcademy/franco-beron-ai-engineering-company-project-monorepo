@@ -28,7 +28,6 @@ class TestLoginHappyPath:
             patch("app.main.create_access_token", return_value="jwt-token"),
             patch("app.main.public_user", return_value={
                 "id": fake_user.doc_id,
-                "email": fake_user["email"],
                 "name": "Test User",
                 "role": fake_user["role"],
             }),
@@ -37,7 +36,7 @@ class TestLoginHappyPath:
 
         assert result["access_token"] == "jwt-token"
         assert result["token_type"] == "bearer"
-        assert result["user"]["email"] == fake_user["email"]
+        assert result["user"]["id"] == fake_user.doc_id
 
     def test_login_returns_valid_login_response_schema(self, fake_user, sample_password):
         """El resultado de login es compatible con LoginResponse."""
@@ -50,7 +49,6 @@ class TestLoginHappyPath:
             patch("app.main.create_access_token", return_value="token"),
             patch("app.main.public_user", return_value={
                 "id": fake_user.doc_id,
-                "email": fake_user["email"],
                 "name": "",
                 "role": "user",
             }),

@@ -561,7 +561,8 @@ async function handleLogin(form) {
     });
     state.token = result.access_token;
     sessionStorage.setItem(TOKEN_KEY, state.token);
-    state.user = result.user;
+    const me = await apiRequest("/auth/me");
+    state.user = me;
     const returnTo = new URLSearchParams(window.location.search).get("next");
     if (
       returnTo?.startsWith("/") &&

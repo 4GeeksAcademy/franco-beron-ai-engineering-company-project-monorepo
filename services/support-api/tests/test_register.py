@@ -5,6 +5,8 @@ detección de duplicados y validación de schema.
 """
 
 from unittest.mock import patch
+from datetime import datetime, timezone
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -12,31 +14,36 @@ from fastapi import HTTPException
 from app.schemas import UserCreate
 from app.routers.users import register_user
 from app.user_service import create_user, get_user_by_email
+from tests.conftest import FakeDocument
 
 
 class TestRegisterHappyPath:
     """Camino feliz — datos válidos, usuario creado."""
 
     def test_register_creates_user_and_profile(self, sample_user_data):
-        """Registro con datos válidos crea usuario y retorna datos públicos."""
+        """Registro con datos válidos crea usuario y retorna datos públicos sin email."""
         payload = UserCreate(**sample_user_data)
 
+        mock_user = FakeDocument(
+            10,
+            email=sample_user_data["email"],
+            is_active=True,
+            role="user",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            uuid=str(uuid4()),
+        )
+        mock_profile = FakeDocument(100, name=sample_user_data["name"])
+
         with (
-            patch("app.routers.users.create_user") as mock_create,
-            patch("app.routers.users.public_user", return_value={
-                "id": 10,
-                "email": sample_user_data["email"],
-                "is_active": True,
-                "role": "user",
-                "created_at": "2026-01-01T00:00:00+00:00",
-            }),
+            patch("app.routers.users.create_user", return_value=(mock_user, mock_profile)),
         ):
-            mock_create.return_value = (None, None)
             result = register_user(payload)
 
-        assert result["email"] == sample_user_data["email"]
+        assert result["id"] == 10
+        assert result["name"] == sample_user_data["name"]
         assert result["is_active"] is True
         assert result["role"] == "user"
+        assert "email" not in result, "RegisterResponse no debe contener email"
 
     def test_create_user_hashes_password(self, sample_user_data):
         """La contraseña se almacena hasheada, no en texto plano."""
@@ -81,11 +88,19 @@ class TestRegisterHappyPath:
 
     def test_register_creates_profile_with_optional_fields(self, sample_user_data):
         """El perfil se crea con name, phone y address cuando se proporcionan."""
+        mock_user = FakeDocument(
+            10,
+            email=sample_user_data["email"],
+            is_active=True,
+            role="user",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            uuid=str(uuid4()),
+        )
+        mock_profile = FakeDocument(100, name=sample_user_data["name"])
+
         with (
-            patch("app.routers.users.create_user") as mock_create,
-            patch("app.routers.users.public_user"),
+            patch("app.routers.users.create_user", return_value=(mock_user, mock_profile)) as mock_create,
         ):
-            mock_create.return_value = (None, None)
             payload = UserCreate(**sample_user_data)
             register_user(payload)
 
@@ -131,20 +146,25 @@ class TestRegisterEdgeCases:
             email="minimal@example.com",
             password="secure-password-8chars",
         )
+        mock_user = FakeDocument(
+            11,
+            email="minimal@example.com",
+            is_active=True,
+            role="user",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            uuid=str(uuid4()),
+        )
+        mock_profile = FakeDocument(101, name=None)
+
         with (
-            patch("app.routers.users.create_user") as mock_create,
-            patch("app.routers.users.public_user", return_value={
-                "id": 11,
-                "email": "minimal@example.com",
-                "is_active": True,
-                "role": "user",
-                "created_at": "2026-01-01T00:00:00+00:00",
-            }),
+            patch("app.routers.users.create_user", return_value=(mock_user, mock_profile)) as mock_create,
         ):
-            mock_create.return_value = (None, None)
             result = register_user(payload)
 
-        assert result["email"] == "minimal@example.com"
+        assert result["id"] == 11
+        assert result["name"] is None
+        assert result["role"] == "user"
+        assert "email" not in result, "RegisterResponse no debe contener email"
         # Verificar que los opcionales se pasaron como None
         call_args = mock_create.call_args[0]
         profile_values = call_args[2] if len(call_args) > 2 else {}
