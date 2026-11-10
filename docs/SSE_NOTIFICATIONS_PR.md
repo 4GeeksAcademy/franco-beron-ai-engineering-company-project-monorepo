@@ -72,6 +72,7 @@ Implementación del sistema de notificaciones en tiempo real mediante **Server-S
 **¿Cuándo necesitaríamos una capa compartida (Redis Pub/Sub)?** Si la aplicación escala horizontalmente a múltiples workers de Uvicorn o múltiples servidores. En ese caso, el `SSEManager` en memoria no funciona porque los eventos broadcast desde worker A no llegan a los clientes conectados a worker B. Ahí se necesitaría Redis Pub/Sub (o similar) como capa intermedia. Pero para un solo proceso, el patrón actual es correcto.
 
 **¿Cuándo es mejor una capa externa?** Si se necesita:
+
 - Múltiples workers/máquinas
 - Persistencia de eventos (más allá del ring buffer de 100)
 - Agregación cross-cliente (contar cuántos vieron un evento, etc.)
@@ -91,6 +92,7 @@ Implementación del sistema de notificaciones en tiempo real mediante **Server-S
 5. Si `last_event_id` es anterior al evento más antiguo del buffer (ya fue evictado), el cliente no recibe replay — confía en que el refetch de la lista de tickets (trigger por `loadRFPTickets()`) recuperará el estado completo
 
 **Deduplicación:** El frontend mantiene un `Set<string>` llamado `sseSeenTicketIds` con todos los `ticket_id` ya recibidos. Antes de procesar cualquier evento, verifica si `data.ticket_id` ya está en el set. Si está, lo salta silenciosamente. Esto evita duplicados en dos escenarios:
+
 - Replay de eventos que el cliente ya había recibido antes de desconectarse
 - La doble notificación (SSE + refetch) alrededor de la reconexión
 
@@ -102,15 +104,15 @@ Implementación del sistema de notificaciones en tiempo real mediante **Server-S
 
 **Por qué SSE es la herramienta correcta:**
 
-| Aspecto | SSE | WebSockets |
-|---|---|---|
-| **Dirección** | Unidireccional (servidor → cliente) | Bidireccional |
-| **Caso de uso** | Notificaciones, streams de eventos | Chat, juegos, colaboración en tiempo real |
-| **Protocolo** | HTTP estándar (funciona con proxies, load balancers) | Upgrade de protocolo (ws://) |
-| **Reconexión automática** | Nativa (`EventSource`) + manual con `fetch` | Hay que implementarla |
-| **Auth** | Headers HTTP estándar | Hay que negociarla en el handshake |
-| **Complejidad** | Baja | Media/alta |
-| **Mensajes** | Solo texto (UTF-8) | Texto y binario |
+| Aspecto                   | SSE                                                  | WebSockets                                |
+| ------------------------- | ---------------------------------------------------- | ----------------------------------------- |
+| **Dirección**             | Unidireccional (servidor → cliente)                  | Bidireccional                             |
+| **Caso de uso**           | Notificaciones, streams de eventos                   | Chat, juegos, colaboración en tiempo real |
+| **Protocolo**             | HTTP estándar (funciona con proxies, load balancers) | Upgrade de protocolo (ws://)              |
+| **Reconexión automática** | Nativa (`EventSource`) + manual con `fetch`          | Hay que implementarla                     |
+| **Auth**                  | Headers HTTP estándar                                | Hay que negociarla en el handshake        |
+| **Complejidad**           | Baja                                                 | Media/alta                                |
+| **Mensajes**              | Solo texto (UTF-8)                                   | Texto y binario                           |
 
 **Para la notificación de tickets RFP, SSE es ideal porque:**
 
@@ -122,6 +124,7 @@ Implementación del sistema de notificaciones en tiempo real mediante **Server-S
 **¿Cuándo dejaría de ser suficiente SSE?** Si quisiéramos que alguien pudiera **reaccionar al ticket desde el mismo canal** (por ejemplo, asignarlo, cambiarlo de prioridad, o discutirlo en un chat), entonces necesitaríamos bidireccionalidad — ahí WebSockets es la herramienta correcta. El proyecto menciona esto explícitamente: "la Parte 2 (chat WebSocket) vive en `real-time-communication/`".
 
 También dejaría de ser suficiente SSE si:
+
 - Necesitamos enviar datos binarios al servidor en tiempo real (ej. audio/video)
 - El volumen de mensajes es muy alto (>1000 msg/s) donde el overhead de SSE (reconexión HTTP) se vuelve significativo
 - Necesitamos entrega ordenada y garantizada con acknowledgments individuales
@@ -132,28 +135,28 @@ También dejaría de ser suficiente SSE si:
 
 ### Backend
 
-| Archivo | Cambio |
-|---|---|
-| `services/support-api/app/notifications.py` | **NUEVO** — `SSEManager`, `SSEEvent`, ring buffer, pub/sub |
-| `services/support-api/app/routers/events.py` | **NUEVO** — `GET /api/events/stream`, `POST /api/events/kpi-alert` |
-| `services/support-api/app/routers/rfp.py` | **MODIFICADO** — broadcast SSE en upload + pipeline completion |
-| `services/support-api/app/kpi_monitor.py` | **NUEVO** — `compute_kpis()`, `broadcast_kpi_alerts()`, `run_background_kpi_monitor()` |
-| `services/support-api/app/main.py` | **MODIFICADO** — lifespan inicia/limpia KPI monitor, registra `events_router` |
+| Archivo                                      | Cambio                                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `services/support-api/app/notifications.py`  | **NUEVO** — `SSEManager`, `SSEEvent`, ring buffer, pub/sub                             |
+| `services/support-api/app/routers/events.py` | **NUEVO** — `GET /api/events/stream`, `POST /api/events/kpi-alert`                     |
+| `services/support-api/app/routers/rfp.py`    | **MODIFICADO** — broadcast SSE en upload + pipeline completion                         |
+| `services/support-api/app/kpi_monitor.py`    | **NUEVO** — `compute_kpis()`, `broadcast_kpi_alerts()`, `run_background_kpi_monitor()` |
+| `services/support-api/app/main.py`           | **MODIFICADO** — lifespan inicia/limpia KPI monitor, registra `events_router`          |
 
 ### Frontend
 
-| Archivo | Cambio |
-|---|---|
-| `uis/backoffice/lib/sse.js` | **NUEVO** — Cliente SSE reutilizable (fetch + ReadableStream) |
-| `uis/backoffice/main.js` | **MODIFICADO** — SSE inline client, toast notifications, dedup, reconexión |
-| `uis/backoffice/styles.css` | **MODIFICADO** — `sse-toast` animado, `system-status` indicator |
+| Archivo                     | Cambio                                                                     |
+| --------------------------- | -------------------------------------------------------------------------- |
+| `uis/backoffice/lib/sse.js` | **NUEVO** — Cliente SSE reutilizable (fetch + ReadableStream)              |
+| `uis/backoffice/main.js`    | **MODIFICADO** — SSE inline client, toast notifications, dedup, reconexión |
+| `uis/backoffice/styles.css` | **MODIFICADO** — `sse-toast` animado, `system-status` indicator            |
 
 ### Testing
 
-| Archivo | Cambio |
-|---|---|
+| Archivo                           | Cambio                   |
+| --------------------------------- | ------------------------ |
 | `tests/test_sse_notifications.py` | **NUEVO** — 24 tests SSE |
-| `tests/test_kpi_monitor.py` | **NUEVO** — 17 tests KPI |
+| `tests/test_kpi_monitor.py`       | **NUEVO** — 17 tests KPI |
 
 ---
 
