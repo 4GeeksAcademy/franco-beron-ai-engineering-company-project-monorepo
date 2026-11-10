@@ -91,3 +91,4 @@ Como no hay runner global en raíz, los comandos se ejecutan por proyecto o medi
 - La base inicia sin históricos hasta disponer del CSV real de Nexova.
 - Se incorpora `memory-bank/` y configuración `.agents/` para continuidad operativa entre sesiones.
 - La API registra latencia por request con `api.timing` y usa caché TTL en proceso para el catálogo de inventario (30 s) y el resumen de incidencias centrales (15 s). Las claves incluyen `doc_id`; las escrituras relacionadas invalidan el namespace. La invalidación es local a cada worker.
+- El análisis de sentimiento WeLoveReviews vive aislado en `data/pipelines/analisis-sentimiento/`: `requirements.txt` fija Transformers/Torch CPU y el modelo fija su revisión Hugging Face; `requirements-eda.txt` fija scikit-learn/seaborn. La inferencia carga el modelo una vez por ejecución, escribe el CSV procesado y no versiona los pesos.
