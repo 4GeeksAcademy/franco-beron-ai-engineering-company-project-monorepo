@@ -287,3 +287,22 @@
 - Se añadió una ruta defensiva en `scripts/seed_incidents.py` con `load_csv_rows()` para capturar archivos no existentes o CSV corruptos y devolver `exit code 1` con mensajes a `stderr`.
 - Se actualizó `skills/data-analysis/scripts/pandas_clean.py` para abortar con `SystemExit(1)` en ficheros faltantes o datos inválidos y evitar impresiones de datasets completos que puedan filtrar contenido sensible.
 - Validaciones: `uv run python -m unittest discover -s tests` en `services/support-api` (16 pruebas OK), `python scripts/seed_incidents.py /tmp/does-not-exist.csv` devuelve `exit=1` con mensaje amigable en `stderr`, y `npx next build` en `uis/backoffice` compila correctamente.
+
+## Análisis de sentimiento en reseñas (2026-11-10)
+
+- Se creó `feature/analisis-sentimiento` desde `feature/caching-optimisation`, con el árbol limpio.
+- Se incorporó el dataset oficial `reviews.csv` bajo `data/pipelines/analisis-sentimiento/data/raw/`. EDA ejecutado: 500 filas, columnas esperadas, sin nulos ni IDs duplicados, siete textos repetidos con IDs distintos preservados y rating medio 4,50.
+- El notebook `src/explore.ipynb` documenta objetivos, EDA, limpieza, modelo, inferencia, métricas, errores, 20 revisiones manuales, función reusable, exportación y conclusiones. Todas sus celdas de código tienen outputs ejecutados.
+- Se fijó `nlptown/bert-base-multilingual-uncased-sentiment` en revisión `8f6f4e3a8f70be4b65d3a4a8762b6d781cda240d`; la pipeline carga una sola vez por proceso, procesa lotes y mapea 1–2/3/4–5 estrellas a negativo/neutral/positivo. Los pesos no se versionan.
+- Producción: `src/app.py` valida columnas y ratings y escribe `data/processed/reviews_with_sentiment.csv`. La ejecución real procesó 500 reseñas: 412 positivas, 41 neutrales y 47 negativas, sin nulos, con rating medio 4,50.
+- Métricas frente a bandas derivadas del rating (proxy, no etiquetas gold): accuracy 95%, F1 macro 0,8632; rating 4–5 con predicción negativa: 16/432, de los que 14 parecen claramente positivos y 2 contienen quejas compensadas. El notebook recomienda usar el modelo como señal de revisión, no como medición definitiva.
+- Se generaron `reports/metrics.json`, `reports/manual_review_sample.csv` y figuras EDA/matriz de confusión. No se descargaron pesos al repositorio.
+- Dependencias ML fijadas en `requirements.txt`; EDA complementario fijado en `requirements-eda.txt`. `.venv` y checkpoints están ignorados localmente.
+
+### Validaciones
+
+- Todas las celdas del notebook: ejecutadas sin errores; entorno muestra versiones de pandas, NumPy, scikit-learn, Transformers, Torch CPU, Matplotlib y seaborn.
+- `src/app.py`: `py_compile` aprobado; ejecución completa sobre el CSV oficial aprobada; CSV comprobado con 500 filas, 0 nulos, bandas válidas y scores entre 0,2553 y 0,994.
+- Diagnósticos del editor en `src/app.py`: sin errores; `git diff --check`: aprobado.
+- Limitación local: VS Code seleccionó el `.venv` de `services/support-api` para el kernel; la ejecución reproducible de producción usa el `.venv` dedicado del pipeline. No se usó GPU.
+- La rama queda sin commit ni push; no se creó PR en esta tarea.

@@ -1,0 +1,57 @@
+{
+  "model": "nlptown/bert-base-multilingual-uncased-sentiment",
+  "revision": "8f6f4e3a8f70be4b65d3a4a8762b6d781cda240d",
+  "sample_size": 500,
+  "human_mean_rating": 4.5,
+  "model_mean_stars": 4.398,
+  "rating_distribution": {
+    "1": 12,
+    "2": 18,
+    "3": 38,
+    "4": 72,
+    "5": 360
+  },
+  "sentiment_distribution": {
+    "positive": 412,
+    "neutral": 41,
+    "negative": 47
+  },
+  "metrics_vs_rating_proxy": {
+    "accuracy": 0.95,
+    "precision_macro": 0.816468,
+    "recall_macro": 0.93603,
+    "f1_macro": 0.863217,
+    "f1_weighted": 0.954504,
+    "human_mean_rating": 4.5,
+    "model_mean_stars": 4.398,
+    "human_high_rating_percent": 86.4,
+    "model_positive_percent": 82.4
+  },
+  "confusion_labels": [
+    "negative",
+    "neutral",
+    "positive"
+  ],
+  "confusion_matrix": [
+    [
+      28,
+      2,
+      0
+    ],
+    [
+      3,
+      35,
+      0
+    ],
+    [
+      16,
+      4,
+      412
+    ]
+  ],
+  "high_rating_negative_predictions": 16,
+  "low_rating_positive_predictions": 0,
+  "neutral_rating_disagreements": 3,
+  "manual_review_count": 20,
+  "inference_seconds": 55.83
+}
