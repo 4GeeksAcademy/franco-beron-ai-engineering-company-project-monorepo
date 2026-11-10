@@ -1,5 +1,283 @@
 const API_URL = "/backend";
 const TOKEN_KEY = "nexova_support_token";
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  SSE (Server-Sent Events) Real-Time Notification Client            */
+/* ────────────────────────────────────────────────────────────────── */
+/*  Uses fetch() + ReadableStream instead of EventSource so we can   */
+/*  send the JWT Bearer token via Authorization header.              */
+/*  Supports exponential backoff reconnection and Last-Event-ID      */
+/*  recovery.                                                        */
+/* ────────────────────────────────────────────────────────────────── */
+
+const SSE_BACKOFF_INITIAL_MS = 1000;
+const SSE_BACKOFF_MAX_MS = 30000;
+const SSE_BACKOFF_JITTER = 0.2;
+
+/** @type {AbortController|null} */
+let sseAbortController = null;
+let sseLastEventId = null;
+let sseRetryCount = 0;
+let sseConnected = false;
+let sseDestroyed = false;
+
+/** @type {Set<string>} Track received ticket_ids for deduplication */
+let sseSeenTicketIds = new Set();
+
+function sseLog(...args) {
+  // Uncomment for debugging: console.log("[SSE]", ...args);
+}
+
+function sseEmitEvent(eventType, data) {
+  if (sseDestroyed) return;
+
+  // Deduplicate by ticket_id
+  if (data && data.ticket_id) {
+    if (sseSeenTicketIds.has(data.ticket_id)) {
+      sseLog(`Duplicate ticket_id ${data.ticket_id}, skipping`);
+      return;
+    }
+    sseSeenTicketIds.add(data.ticket_id);
+  }
+
+  sseLog(`Event: ${eventType}`, data);
+
+  if (eventType === "rfp_ticket_created" && data) {
+    handleRfpTicketCreated(data);
+  }
+}
+
+function sseScheduleReconnect() {
+  if (sseDestroyed) return;
+
+  sseRetryCount++;
+  const delay = Math.min(
+    SSE_BACKOFF_INITIAL_MS * Math.pow(2, sseRetryCount - 1),
+    SSE_BACKOFF_MAX_MS,
+  );
+  const jitter = delay * SSE_BACKOFF_JITTER * (Math.random() * 2 - 1);
+  const actualDelay = Math.round(delay + jitter);
+
+  sseLog(`Reconnecting in ${actualDelay}ms (attempt ${sseRetryCount})`);
+
+  setTimeout(() => {
+    if (!sseDestroyed) {
+      sseConnect();
+    }
+  }, actualDelay);
+}
+
+async function sseConnect() {
+  if (sseDestroyed) return;
+
+  const token = state.token;
+  if (!token) {
+    sseLog("No token, will retry later");
+    sseScheduleReconnect();
+    return;
+  }
+
+  sseAbortController = new AbortController();
+
+  const url = new URL(`${API_URL}/api/events/stream`);
+  if (sseLastEventId !== null) {
+    url.searchParams.set("Last-Event-ID", String(sseLastEventId));
+  }
+
+  sseLog(`Connecting to ${url.pathname}${url.search}`);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "text/event-stream",
+      },
+      signal: sseAbortController.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error("No readable body in SSE response");
+    }
+
+    sseConnected = true;
+    sseRetryCount = 0;
+    sseLog("SSE connected");
+
+    // Update UI to show SSE is active
+    updateSSEStatus(true);
+
+    await sseReadStream(response.body.getReader());
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    sseConnected = false;
+    sseLog(`Connection error: ${error.message}`);
+    updateSSEStatus(false);
+    sseScheduleReconnect();
+  }
+}
+
+async function sseReadStream(reader) {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        sseLog("Stream ended");
+        sseConnected = false;
+        updateSSEStatus(false);
+        sseScheduleReconnect();
+        return;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const messages = buffer.split("\n\n");
+      buffer = messages.pop() || "";
+
+      for (const message of messages) {
+        if (!message.trim()) continue;
+        sseParseMessage(message);
+      }
+    }
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    sseConnected = false;
+    sseLog(`Stream error: ${error.message}`);
+    updateSSEStatus(false);
+    sseScheduleReconnect();
+  }
+}
+
+function sseParseMessage(raw) {
+  const lines = raw.split("\n");
+  let eventType = "message";
+  let data = "";
+  let id = null;
+
+  for (const line of lines) {
+    if (line.startsWith("id: ")) {
+      id = line.slice(4).trim();
+    } else if (line.startsWith("event: ")) {
+      eventType = line.slice(7).trim();
+    } else if (line.startsWith("data: ")) {
+      data = line.slice(6).trim();
+    } else if (line.startsWith(":")) {
+      // Keep-alive comment — ignore
+    }
+  }
+
+  if (id !== null) {
+    sseLastEventId = parseInt(id, 10);
+  }
+
+  let parsedData = null;
+  if (data) {
+    try {
+      parsedData = JSON.parse(data);
+    } catch {
+      sseLog(`Failed to parse data JSON: ${data.slice(0, 60)}`);
+      return;
+    }
+  }
+
+  sseEmitEvent(eventType, parsedData);
+}
+
+function sseDisconnect() {
+  sseDestroyed = true;
+  sseConnected = false;
+  if (sseAbortController) {
+    sseAbortController.abort();
+    sseAbortController = null;
+  }
+  updateSSEStatus(false);
+}
+
+function updateSSEStatus(connected) {
+  const statusEl = document.querySelector(".system-status");
+  if (statusEl) {
+    if (connected) {
+      statusEl.innerHTML = `${icon("radio")}<span>Tiempo real conectado</span>`;
+    } else {
+      statusEl.innerHTML = `${icon("radio")}<span>Tiempo real: reconectando...</span>`;
+    }
+    // Set data-connected attribute on the inner span for CSS styling
+    const indicator = statusEl.querySelector("span");
+    if (indicator) {
+      indicator.setAttribute("data-connected", String(connected));
+    }
+    renderIcons();
+  }
+}
+
+/**
+ * Handle a new RFP ticket notification received via SSE.
+ * Shows a visual notification in the dashboard and updates the RFP list.
+ */
+function handleRfpTicketCreated(data) {
+  // Show toast notification
+  showRFPNotification(data);
+
+  // Refresh the RFP tickets list to include the new one
+  // (the SSE event comes first, then the list refresh confirms)
+  setTimeout(() => void loadRFPTickets(), 500);
+}
+
+/**
+ * Display a prominent toast/banner notification for new RFP ticket.
+ */
+function showRFPNotification(data) {
+  const existing = document.querySelector(".sse-toast");
+  if (existing) existing.remove();
+
+  const clientName = data.client_name || "Cliente desconocido";
+  const services = Array.isArray(data.services_requested)
+    ? data.services_requested.join(", ")
+    : "—";
+
+  const toast = document.createElement("div");
+  toast.className = "sse-toast sse-toast-visible";
+  toast.setAttribute("role", "alert");
+  toast.innerHTML = `
+    <div class="sse-toast-icon">${icon("zap")}</div>
+    <div class="sse-toast-content">
+      <strong>¡Nueva RFP recibida!</strong>
+      <span class="sse-toast-meta">${escapeHTML(clientName)} · ${escapeHTML(data.ticket_id)}</span>
+      <span class="sse-toast-services">${escapeHTML(services)}</span>
+    </div>
+    <button class="sse-toast-close" type="button" aria-label="Cerrar" data-action="close-toast">${icon("x")}</button>
+  `;
+
+  document.body.appendChild(toast);
+  renderIcons();
+
+  // Auto-dismiss after 8 seconds
+  setTimeout(() => {
+    toast.classList.remove("sse-toast-visible");
+    toast.classList.add("sse-toast-hiding");
+    setTimeout(() => toast.remove(), 400);
+  }, 8000);
+
+  // Close button
+  toast.querySelector(".sse-toast-close")?.addEventListener("click", () => {
+    toast.remove();
+  });
+
+  // Click on toast scrolls to RFP section
+  toast.addEventListener("click", (event) => {
+    if (event.target.closest(".sse-toast-close")) return;
+    document.getElementById("rfp")?.scrollIntoView({ behavior: "smooth" });
+    toast.remove();
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────── */
 const CATEGORIES = ["TECHNICAL", "BILLING", "ACCESS", "HR_QUERY", "COMPLAINT"];
 const STATUSES = ["OPEN", "CLOSED", "DISCARDED"];
 const STATUS_LABELS = {
@@ -52,6 +330,12 @@ const priorities = [
   "Asegurar que reportes y UIs no expongan correos de clientes.",
 ];
 
+const RFP_STATUS_LABELS = {
+  analizando: "Analizando",
+  descartado: "Descartado",
+  analisis_completo: "Completado",
+};
+
 const state = {
   token: sessionStorage.getItem(TOKEN_KEY),
   user: null,
@@ -65,6 +349,11 @@ const state = {
   notice: "",
   listLoading: false,
   summaryLoading: false,
+  rfpTickets: [],
+  rfpTicketsLoading: false,
+  rfpTicketsError: "",
+  rfpDetail: null,
+  rfpDetailLoading: false,
 };
 
 const app = document.getElementById("app");
@@ -236,6 +525,9 @@ function renderResetPassword(token, message = "", messageType = "") {
 }
 
 function renderDashboard() {
+  // Disconnect any previous SSE connection before re-rendering
+  sseDisconnect();
+
   app.className = "layout";
   app.innerHTML = `
     <aside class="sidebar">
@@ -245,6 +537,7 @@ function renderDashboard() {
         <a class="nav-link" href="/backoffice/inventory/products">${icon("boxes")}<span>Inventario</span></a>
         <a class="nav-link" href="/backoffice/suppliers">${icon("building-2")}<span>Proveedores</span></a>
         <a class="nav-link" href="#tickets">${icon("inbox")}<span>Tickets</span></a>
+        <a class="nav-link" href="#rfp">${icon("file-text")}<span>RFPs</span></a>
         <a class="nav-link" href="#prioridades">${icon("list-checks")}<span>Prioridades</span></a>
         <a class="nav-link" href="#privacidad">${icon("shield-check")}<span>Privacidad</span></a>
       </nav>
@@ -262,7 +555,7 @@ function renderDashboard() {
           <p class="header-copy">Visión diaria de carga, servicio y satisfacción.</p>
         </div>
         <div class="user-controls">
-          <span class="system-status"><span aria-hidden="true"></span>API conectada</span>
+          <span class="system-status"><span aria-hidden="true" data-connected="false"></span>Conectando...</span>
           <button class="secondary-button" type="button" data-action="change-password">${icon("key-round")}<span>Cambiar contraseña</span></button>
         </div>
       </header>
@@ -325,6 +618,29 @@ function renderDashboard() {
           </div>
           <div id="incident-list" aria-live="polite"></div>
         </section>
+      </section>
+
+      <section class="panel rfp-panel" id="rfp">
+        <div class="panel-heading"><span class="section-icon">${icon("file-text")}</span><div><p class="kicker">Recepción de RFPs</p><h2>Propuestas entrantes</h2></div></div>
+        <div class="rfp-upload-area">
+          <form id="rfp-upload-form" class="form-stack">
+            <label for="rfp-file">Subir RFP (PDF)</label>
+            <div class="file-input-shell">
+              <input id="rfp-file" name="file" type="file" accept=".pdf" required />
+              <span class="file-name-placeholder" id="rfp-file-name">Ningún archivo seleccionado</span>
+            </div>
+            <button class="primary-button" type="submit">${icon("upload")}<span>Subir y analizar</span></button>
+          </form>
+          <p id="rfp-upload-notice" class="form-message" role="status"></p>
+          <p id="rfp-upload-error" class="form-message error-message" role="alert"></p>
+        </div>
+        <div class="rfp-tickets-list" id="rfp-tickets-list" aria-live="polite">
+          <div class="section-heading">
+            <h3>Tickets RFP</h3>
+            <button class="icon-button" type="button" data-action="refresh-rfp" aria-label="Actualizar RFPs" title="Actualizar RFPs">${icon("refresh-cw")}</button>
+          </div>
+          <div id="rfp-tickets-container"></div>
+        </div>
       </section>
 
       <section class="panel" id="prioridades">
@@ -466,6 +782,152 @@ function renderIncidents() {
   renderIcons();
 }
 
+function renderRFPTickets() {
+  const container = document.getElementById("rfp-tickets-container");
+  if (!container) return;
+  if (state.rfpTicketsLoading) {
+    container.innerHTML = `<div class="loading-state">${icon("loader-circle", "spin")}<span>Cargando tickets RFP...</span></div>`;
+    renderIcons();
+    return;
+  }
+  if (state.rfpTicketsError) {
+    container.innerHTML = `<p class="error-message">${escapeHTML(state.rfpTicketsError)}</p>`;
+    renderIcons();
+    return;
+  }
+  if (!state.rfpTickets || state.rfpTickets.length === 0) {
+    container.innerHTML = `<div class="empty-state">${icon("file-text")}<strong>No hay RFPs</strong><span>Sube un PDF para iniciar el análisis.</span></div>`;
+    renderIcons();
+    return;
+  }
+
+  container.innerHTML = state.rfpTickets
+    .map(
+      (ticket) => `
+    <article class="rfp-ticket-item ${ticket.handoff_ready ? "rfp-ready" : ""}" data-ticket-id="${escapeHTML(ticket.ticket_id)}">
+      <div class="rfp-ticket-header">
+        <strong>Ticket: ${escapeHTML(ticket.ticket_id)}</strong>
+        <span class="status-label status-${escapeHTML(ticket.status)}">
+          ${escapeHTML(RFP_STATUS_LABELS[ticket.status] || ticket.status)}
+        </span>
+      </div>
+      <p class="rfp-ticket-file">${escapeHTML(ticket.pdf_filename)}</p>
+      <div class="rfp-ticket-meta">
+        <span>Creado: ${escapeHTML(ticket.created_at ? new Date(ticket.created_at).toLocaleString("es-ES") : "-")}</span>
+      </div>
+      ${ticket.error_message ? `<p class="error-message">${escapeHTML(ticket.error_message)}</p>` : ""}
+      <button class="secondary-button rfp-view-detail" type="button" data-ticket-id="${escapeHTML(ticket.ticket_id)}">
+        ${icon("eye")}<span>Ver detalle</span>
+      </button>
+    </article>
+  `,
+    )
+    .join("");
+  renderIcons();
+}
+
+function renderRFPTicketDetail(ticketId) {
+  const container = document.getElementById("rfp-tickets-container");
+  if (!container) return;
+
+  if (state.rfpDetailLoading) {
+    container.innerHTML = `<div class="loading-state">${icon("loader-circle", "spin")}<span>Cargando detalle...</span></div>`;
+    renderIcons();
+    return;
+  }
+
+  const detail = state.rfpDetail;
+  if (!detail) {
+    container.innerHTML = `<p class="error-message">No se pudo cargar el detalle.</p>`;
+    renderIcons();
+    return;
+  }
+
+  const meta = detail.metadata || {};
+  const depts = detail.departments || [];
+  const handoff = detail.handoff || {};
+
+  let html = `
+    <div class="rfp-detail-header">
+      <button class="text-button" type="button" data-action="back-rfp-list">${icon("arrow-left")}<span>Volver</span></button>
+      <h3>Ticket: ${escapeHTML(detail.ticket_id)}</h3>
+      <span class="status-label status-${escapeHTML(detail.status)}">
+        ${escapeHTML(RFP_STATUS_LABELS[detail.status] || detail.status)}
+      </span>
+    </div>
+    <dl class="rfp-detail-meta">
+      <div><dt>Archivo</dt><dd>${escapeHTML(detail.pdf_filename)}</dd></div>
+      <div><dt>Creado</dt><dd>${detail.created_at ? new Date(detail.created_at).toLocaleString("es-ES") : "-"}</dd></div>
+  `;
+  if (detail.updated_at && detail.updated_at !== detail.created_at) {
+    html += `<div><dt>Actualizado</dt><dd>${new Date(detail.updated_at).toLocaleString("es-ES")}</dd></div>`;
+  }
+  if (detail.error_message) {
+    html += `<div><dt>Error</dt><dd class="error-message">${escapeHTML(detail.error_message)}</dd></div>`;
+  }
+  html += `</dl>`;
+
+  // Show metadata if available
+  if (meta && meta.client_name) {
+    html += `
+      <div class="rfp-section">
+        <h4>Metadatos del cliente</h4>
+        <dl class="rfp-detail-meta">
+          <div><dt>Cliente</dt><dd>${escapeHTML(meta.client_name)}</dd></div>
+          <div><dt>Sede</dt><dd>${escapeHTML(meta.client_hq || "-")}</dd></div>
+          <div><dt>Servicios</dt><dd>${escapeHTML(meta.services_requested || "-")}</dd></div>
+          <div><dt>Alcance</dt><dd>${escapeHTML(meta.scope || "-")}</dd></div>
+          <div><dt>Departamentos</dt><dd>${meta.departments_needed ? meta.departments_needed.join(", ") : "-"}</dd></div>
+        </dl>
+      </div>
+    `;
+  }
+
+  // Show departments
+  if (depts.length > 0) {
+    html += `<div class="rfp-section"><h4>Análisis por departamento</h4>`;
+    depts.forEach((dept) => {
+      html += `
+        <div class="rfp-dept-card">
+          <h5>${escapeHTML(dept.department_name)}</h5>
+          <p class="rfp-dept-responsible">Responsable: ${escapeHTML(dept.responsible)}</p>
+          <div class="rfp-dept-aspects">
+            <strong>Aspectos clave:</strong>
+            <pre class="rfp-aspects-text">${escapeHTML(dept.key_aspects)}</pre>
+          </div>
+          ${
+            dept.open_questions
+              ? `
+          <div class="rfp-dept-questions">
+            <strong>Preguntas abiertas:</strong>
+            <p>${escapeHTML(dept.open_questions)}</p>
+          </div>`
+              : ""
+          }
+        </div>
+      `;
+    });
+    html += `</div>`;
+  }
+
+  // Show handoff info
+  if (handoff && handoff.currency) {
+    html += `
+      <div class="rfp-section">
+        <h4>Handoff para Parte 2</h4>
+        <dl class="rfp-detail-meta">
+          <div><dt>Moneda</dt><dd>${escapeHTML(handoff.currency)}</dd></div>
+          <div><dt>Departamentos activos</dt><dd>${handoff.departments_active ? handoff.departments_active.join(", ") : "-"}</dd></div>
+        </dl>
+      </div>
+    `;
+  }
+
+  html += `<button class="text-button" type="button" data-action="back-rfp-list">${icon("arrow-left")}<span>Volver al listado</span></button>`;
+  container.innerHTML = html;
+  renderIcons();
+}
+
 function setTicketMessage({ notice = "", error = "" } = {}) {
   const noticeNode = document.getElementById("ticket-notice");
   const errorNode = document.getElementById("ticket-error");
@@ -510,6 +972,40 @@ async function loadSummary() {
     state.summaryLoading = false;
     renderSummary();
   }
+}
+
+async function loadRFPTickets() {
+  state.rfpTicketsLoading = true;
+  state.rfpTicketsError = "";
+  renderRFPTickets();
+  try {
+    state.rfpTickets = await apiRequest("/api/rfp/tickets");
+  } catch (error) {
+    state.rfpTicketsError =
+      error instanceof Error
+        ? error.message
+        : "No se pudieron cargar las RFPs.";
+  } finally {
+    state.rfpTicketsLoading = false;
+    renderRFPTickets();
+  }
+}
+
+async function loadRFPTicketDetail(ticketId) {
+  state.rfpDetailLoading = true;
+  state.rfpDetail = null;
+  renderRFPTicketDetail(ticketId);
+  try {
+    state.rfpDetail = await apiRequest(
+      `/api/rfp/status/${encodeURIComponent(ticketId)}`,
+    );
+  } catch (error) {
+    state.rfpDetailLoading = false;
+    renderRFPTicketDetail(ticketId);
+    return;
+  }
+  state.rfpDetailLoading = false;
+  renderRFPTicketDetail(ticketId);
 }
 
 function clearSession(message = "") {
@@ -703,6 +1199,74 @@ async function handleCreateIncident(form) {
   }
 }
 
+async function handleRFPUpload(form) {
+  const button = form.querySelector("button[type='submit']");
+  button.disabled = true;
+  button.textContent = "Subiendo...";
+  const noticeNode = document.getElementById("rfp-upload-notice");
+  const errorNode = document.getElementById("rfp-upload-error");
+  if (noticeNode) noticeNode.textContent = "";
+  if (errorNode) errorNode.textContent = "";
+
+  const fileInput = form.elements.namedItem("file");
+  const file = fileInput.files?.[0];
+  if (!file) {
+    if (errorNode) errorNode.textContent = "Selecciona un archivo PDF.";
+    button.disabled = false;
+    button.innerHTML = `${icon("upload")}<span>Subir y analizar</span>`;
+    renderIcons();
+    return;
+  }
+
+  if (!file.name.toLowerCase().endsWith(".pdf")) {
+    if (errorNode) errorNode.textContent = "Solo se aceptan archivos PDF.";
+    button.disabled = false;
+    button.innerHTML = `${icon("upload")}<span>Subir y analizar</span>`;
+    renderIcons();
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const headers = {};
+    if (state.token) headers.Authorization = `Bearer ${state.token}`;
+
+    const response = await fetch(`${API_URL}/api/rfp/upload`, {
+      method: "POST",
+      headers,
+      body: formData,
+      signal: AbortSignal.timeout(30000),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || data.message || "Error al subir la RFP.");
+    }
+
+    if (noticeNode)
+      noticeNode.textContent = `RFP subida. Ticket: ${data.ticket_id}. El análisis ha comenzado.`;
+    fileInput.value = "";
+    const fileNamePlaceholder = document.getElementById("rfp-file-name");
+    if (fileNamePlaceholder)
+      fileNamePlaceholder.textContent = "Ningún archivo seleccionado";
+
+    // Refresh the list after a delay to show the new ticket
+    setTimeout(() => void loadRFPTickets(), 2000);
+  } catch (error) {
+    if (errorNode)
+      errorNode.textContent =
+        error instanceof Error ? error.message : "Error al subir la RFP.";
+  } finally {
+    if (button.isConnected) {
+      button.disabled = false;
+      button.innerHTML = `${icon("upload")}<span>Subir y analizar</span>`;
+      renderIcons();
+    }
+  }
+}
+
 async function handleStatusUpdate(form) {
   const ticketId = form.dataset.ticketId;
   const formData = new FormData(form);
@@ -765,6 +1329,7 @@ app.addEventListener("submit", (event) => {
   if (form.id === "reset-password-form") void handleResetPassword(form);
   if (form.id === "change-password-form") void handleChangePassword(form);
   if (form.id === "incident-form") void handleCreateIncident(form);
+  if (form.id === "rfp-upload-form") void handleRFPUpload(form);
   if (form.matches(".status-form")) void handleStatusUpdate(form);
 });
 
@@ -773,6 +1338,14 @@ app.addEventListener("change", (event) => {
   if (!filter) return;
   state.filters[filter.dataset.filter] = filter.value;
   void loadIncidents();
+});
+
+app.addEventListener("change", (event) => {
+  const fileInput = event.target.closest("#rfp-file");
+  if (fileInput && fileInput.files?.[0]) {
+    const placeholder = document.getElementById("rfp-file-name");
+    if (placeholder) placeholder.textContent = fileInput.files[0].name;
+  }
 });
 
 app.addEventListener("click", (event) => {
@@ -798,11 +1371,18 @@ app.addEventListener("click", (event) => {
       renderIcons();
     }
   }
-  if (button.dataset.action === "logout") clearSession();
+  if (button.dataset.action === "logout") {
+    sseDisconnect();
+    clearSession();
+  }
   if (button.dataset.action === "forgot-password") renderForgotPassword();
   if (button.dataset.action === "back-login") renderLogin();
   if (button.dataset.action === "change-password") renderChangePassword();
   if (button.dataset.action === "back-dashboard") renderDashboard();
+  if (button.dataset.action === "close-toast") {
+    const toast = button.closest(".sse-toast");
+    if (toast) toast.remove();
+  }
   if (
     button.dataset.action === "refresh" ||
     button.dataset.action === "retry-list"
@@ -810,6 +1390,18 @@ app.addEventListener("click", (event) => {
     void loadIncidents();
   }
   if (button.dataset.action === "retry-summary") void loadSummary();
+  if (button.dataset.action === "refresh-rfp") {
+    void loadRFPTickets();
+  }
+  if (button.dataset.action === "back-rfp-list") {
+    state.rfpDetail = null;
+    renderRFPTickets();
+  }
+  const viewDetailBtn = event.target.closest(".rfp-view-detail");
+  if (viewDetailBtn) {
+    const ticketId = viewDetailBtn.dataset.ticketId;
+    if (ticketId) void loadRFPTicketDetail(ticketId);
+  }
 });
 
 window.addEventListener("load", renderIcons);
@@ -829,7 +1421,13 @@ async function start() {
   try {
     state.user = await apiRequest("/auth/me");
     renderDashboard();
-    await Promise.all([loadIncidents(), loadSummary()]);
+    await Promise.all([loadIncidents(), loadSummary(), loadRFPTickets()]);
+    // Start SSE connection for real-time notifications
+    sseConnected = false;
+    sseDestroyed = false;
+    sseSeenTicketIds = new Set();
+    sseRetryCount = 0;
+    sseConnect();
   } catch {
     if (state.token)
       clearSession("La sesión no es válida. Inicia sesión nuevamente.");

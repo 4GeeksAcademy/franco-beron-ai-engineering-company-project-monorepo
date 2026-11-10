@@ -6,3 +6,13 @@
 **/out/
 *.log
 .coverage
+
+# RFP uploaded PDFs and generated markdown
+data/raw/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.db
+uv.lock

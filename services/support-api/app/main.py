@@ -1,8 +1,10 @@
-from app.error_handling import operation_errors
-from datetime import datetime, timedelta, timezone
+import asyncio
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 import logging
 import time
+
+from app.error_handling import operation_errors
 
 from fastapi import (
     Depends,
@@ -41,10 +43,13 @@ from app.schemas import (
     MessageResponse,
     ResetPasswordRequest,
 )
+from app.kpi_monitor import run_background_kpi_monitor
 from app.routers.inventory import router as inventory_router
 from app.routers.agent import router as agent_router
 from app.routers.incidents import router as central_incidents_router
 from app.routers.profiles import router as profiles_router
+from app.routers.events import router as events_router
+from app.routers.rfp import router as rfp_router
 from app.routers.suppliers import router as suppliers_router
 from app.routers.users import router as users_router
 from app.user_service import (
@@ -65,13 +70,31 @@ from app.security import (
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_inventory_database()
-    yield
+    # Start KPI background monitor for SLA compliance alerts
+    from app.db import incidents as nexova_incidents_table
+
+    async def _get_incidents():
+        return nexova_incidents_table.all()
+
+    monitor_task = asyncio.create_task(
+        run_background_kpi_monitor(_get_incidents)
+    )
+    try:
+        yield
+    finally:
+        monitor_task.cancel()
+        try:
+            await monitor_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Nexova Support API", lifespan=lifespan)
 app.include_router(inventory_router)
 app.include_router(agent_router)
 app.include_router(central_incidents_router)
+app.include_router(events_router)
+app.include_router(rfp_router)
 app.include_router(suppliers_router)
 app.include_router(users_router)
 app.include_router(profiles_router)
