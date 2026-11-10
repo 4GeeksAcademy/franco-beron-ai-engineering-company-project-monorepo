@@ -2868,6 +2868,145 @@ h4 {
   color: var(--text-2, #8ba3a3);
 }
 
+/* =============================================
+   SSE Real-Time Notification Toast
+   ============================================= */
+
+.sse-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 440px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  background: var(--sidebar);
+  color: var(--sidebar-text);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transform: translateY(calc(100% + 40px));
+  opacity: 0;
+  transition:
+    transform 400ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 400ms ease;
+}
+
+.sse-toast-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.sse-toast-hiding {
+  transform: translateY(calc(100% + 40px));
+  opacity: 0;
+}
+
+.sse-toast-icon {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(45, 212, 191, 0.15);
+  color: #5eead4;
+  animation: sse-pulse 2s ease-in-out infinite;
+}
+
+.sse-toast-icon [data-lucide] {
+  width: 20px;
+  height: 20px;
+}
+
+.sse-toast-content {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.sse-toast-content strong {
+  font-family: "Archivo", sans-serif;
+  font-size: 0.9rem;
+  color: #ffffff;
+}
+
+.sse-toast-meta {
+  font-size: 0.78rem;
+  color: var(--sidebar-muted);
+}
+
+.sse-toast-services {
+  font-size: 0.74rem;
+  color: #5eead4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sse-toast-close {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sidebar-muted);
+  opacity: 0.7;
+  transition:
+    opacity 160ms ease,
+    background-color 160ms ease;
+}
+
+.sse-toast-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.sse-toast-close [data-lucide] {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes sse-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 8px rgba(45, 212, 191, 0);
+  }
+}
+
+/* SSE connection status indicator dots */
+.system-status span[data-connected="false"] {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px rgba(168, 95, 8, 0.12);
+}
+
+.system-status span[data-connected="true"] {
+  background: var(--teal);
+  box-shadow: 0 0 0 3px rgba(8, 125, 109, 0.12);
+}
+
+/* Responsive: toast goes full-width on small screens */
+@media (max-width: 600px) {
+  .sse-toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+  }
+}
+
 .rfp-aspects-text {
   white-space: pre-wrap;
   font-family: inherit;

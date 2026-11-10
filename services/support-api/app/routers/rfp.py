@@ -24,7 +24,8 @@ from pydantic import BaseModel
 from app.auth import get_current_user
 from app.database import get_db
 from app.error_handling import operation_errors
-from app.rfp_models import RFPTicket, TicketStatus
+from app.notifications import EVENT_RFP_TICKET_CREATED, SSEEvent, manager
+from app.rfp_models import RFPMetadata, RFPTicket, TicketStatus
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,40 @@ async def _run_pipeline_async(pdf_path: str, pdf_filename: str, ticket_id: str) 
         # by updating the existing ticket's status.
         result = run_rfp_intake(pdf_path, pdf_filename)
         logger.info("Pipeline result for ticket %s: %s", ticket_id, result.get("status"))
+
+        # Broadcast enriched SSE event with client metadata once pipeline completes
+        if result.get("status") == "completed":
+            try:
+                from datetime import timezone
+                with next(get_db()) as session:
+                    ticket = session.query(RFPTicket).filter(RFPTicket.ticket_id == ticket_id).first()
+                    metadata = session.query(RFPMetadata).filter(RFPMetadata.ticket_id == ticket_id).first()
+
+                    if ticket and metadata:
+                        services = []
+                        if metadata.services_requested:
+                            try:
+                                import json
+                                services = json.loads(metadata.services_requested)
+                            except (json.JSONDecodeError, TypeError):
+                                services = [metadata.services_requested]
+
+                        event_data = {
+                            "ticket_id": ticket_id,
+                            "rfp_id": f"rfp_{ticket_id}",
+                            "client_name": metadata.client_name,
+                            "client_hq": metadata.client_hq,
+                            "services_requested": services,
+                            "status": ticket.status,
+                            "created_at": ticket.created_at.astimezone(timezone.utc).isoformat() if ticket.created_at else None,
+                        }
+                        asyncio.create_task(
+                            manager.broadcast(
+                                SSEEvent(event=EVENT_RFP_TICKET_CREATED, data=event_data)
+                            )
+                        )
+            except Exception as meta_exc:
+                logger.warning("Failed to broadcast enriched SSE for ticket %s: %s", ticket_id, meta_exc)
     except Exception as exc:
         logger.exception("Async pipeline failed for ticket %s", ticket_id)
         try:
@@ -148,6 +183,24 @@ async def upload_rfp(
             )
             session.add(ticket)
             session.commit()
+            session.refresh(ticket)
+
+            # Broadcast SSE event for real-time notification
+            from datetime import timezone
+            event_data = {
+                "ticket_id": ticket_id,
+                "rfp_id": f"rfp_{ticket_id}",
+                "client_name": None,
+                "client_hq": None,
+                "services_requested": [],
+                "status": TicketStatus.ANALIZANDO,
+                "created_at": ticket.created_at.astimezone(timezone.utc).isoformat() if ticket.created_at else None,
+            }
+            asyncio.create_task(
+                manager.broadcast(
+                    SSEEvent(event=EVENT_RFP_TICKET_CREATED, data=event_data)
+                )
+            )
     except Exception as exc:
         # Clean up saved file
         if pdf_path.exists():

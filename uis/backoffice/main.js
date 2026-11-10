@@ -1,5 +1,283 @@
 const API_URL = "/backend";
 const TOKEN_KEY = "nexova_support_token";
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  SSE (Server-Sent Events) Real-Time Notification Client            */
+/* ────────────────────────────────────────────────────────────────── */
+/*  Uses fetch() + ReadableStream instead of EventSource so we can   */
+/*  send the JWT Bearer token via Authorization header.              */
+/*  Supports exponential backoff reconnection and Last-Event-ID      */
+/*  recovery.                                                        */
+/* ────────────────────────────────────────────────────────────────── */
+
+const SSE_BACKOFF_INITIAL_MS = 1000;
+const SSE_BACKOFF_MAX_MS = 30000;
+const SSE_BACKOFF_JITTER = 0.2;
+
+/** @type {AbortController|null} */
+let sseAbortController = null;
+let sseLastEventId = null;
+let sseRetryCount = 0;
+let sseConnected = false;
+let sseDestroyed = false;
+
+/** @type {Set<string>} Track received ticket_ids for deduplication */
+let sseSeenTicketIds = new Set();
+
+function sseLog(...args) {
+  // Uncomment for debugging: console.log("[SSE]", ...args);
+}
+
+function sseEmitEvent(eventType, data) {
+  if (sseDestroyed) return;
+
+  // Deduplicate by ticket_id
+  if (data && data.ticket_id) {
+    if (sseSeenTicketIds.has(data.ticket_id)) {
+      sseLog(`Duplicate ticket_id ${data.ticket_id}, skipping`);
+      return;
+    }
+    sseSeenTicketIds.add(data.ticket_id);
+  }
+
+  sseLog(`Event: ${eventType}`, data);
+
+  if (eventType === "rfp_ticket_created" && data) {
+    handleRfpTicketCreated(data);
+  }
+}
+
+function sseScheduleReconnect() {
+  if (sseDestroyed) return;
+
+  sseRetryCount++;
+  const delay = Math.min(
+    SSE_BACKOFF_INITIAL_MS * Math.pow(2, sseRetryCount - 1),
+    SSE_BACKOFF_MAX_MS,
+  );
+  const jitter = delay * SSE_BACKOFF_JITTER * (Math.random() * 2 - 1);
+  const actualDelay = Math.round(delay + jitter);
+
+  sseLog(`Reconnecting in ${actualDelay}ms (attempt ${sseRetryCount})`);
+
+  setTimeout(() => {
+    if (!sseDestroyed) {
+      sseConnect();
+    }
+  }, actualDelay);
+}
+
+async function sseConnect() {
+  if (sseDestroyed) return;
+
+  const token = state.token;
+  if (!token) {
+    sseLog("No token, will retry later");
+    sseScheduleReconnect();
+    return;
+  }
+
+  sseAbortController = new AbortController();
+
+  const url = new URL(`${API_URL}/api/events/stream`);
+  if (sseLastEventId !== null) {
+    url.searchParams.set("Last-Event-ID", String(sseLastEventId));
+  }
+
+  sseLog(`Connecting to ${url.pathname}${url.search}`);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "text/event-stream",
+      },
+      signal: sseAbortController.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error("No readable body in SSE response");
+    }
+
+    sseConnected = true;
+    sseRetryCount = 0;
+    sseLog("SSE connected");
+
+    // Update UI to show SSE is active
+    updateSSEStatus(true);
+
+    await sseReadStream(response.body.getReader());
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    sseConnected = false;
+    sseLog(`Connection error: ${error.message}`);
+    updateSSEStatus(false);
+    sseScheduleReconnect();
+  }
+}
+
+async function sseReadStream(reader) {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        sseLog("Stream ended");
+        sseConnected = false;
+        updateSSEStatus(false);
+        sseScheduleReconnect();
+        return;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const messages = buffer.split("\n\n");
+      buffer = messages.pop() || "";
+
+      for (const message of messages) {
+        if (!message.trim()) continue;
+        sseParseMessage(message);
+      }
+    }
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    sseConnected = false;
+    sseLog(`Stream error: ${error.message}`);
+    updateSSEStatus(false);
+    sseScheduleReconnect();
+  }
+}
+
+function sseParseMessage(raw) {
+  const lines = raw.split("\n");
+  let eventType = "message";
+  let data = "";
+  let id = null;
+
+  for (const line of lines) {
+    if (line.startsWith("id: ")) {
+      id = line.slice(4).trim();
+    } else if (line.startsWith("event: ")) {
+      eventType = line.slice(7).trim();
+    } else if (line.startsWith("data: ")) {
+      data = line.slice(6).trim();
+    } else if (line.startsWith(":")) {
+      // Keep-alive comment — ignore
+    }
+  }
+
+  if (id !== null) {
+    sseLastEventId = parseInt(id, 10);
+  }
+
+  let parsedData = null;
+  if (data) {
+    try {
+      parsedData = JSON.parse(data);
+    } catch {
+      sseLog(`Failed to parse data JSON: ${data.slice(0, 60)}`);
+      return;
+    }
+  }
+
+  sseEmitEvent(eventType, parsedData);
+}
+
+function sseDisconnect() {
+  sseDestroyed = true;
+  sseConnected = false;
+  if (sseAbortController) {
+    sseAbortController.abort();
+    sseAbortController = null;
+  }
+  updateSSEStatus(false);
+}
+
+function updateSSEStatus(connected) {
+  const statusEl = document.querySelector(".system-status");
+  if (statusEl) {
+    if (connected) {
+      statusEl.innerHTML = `${icon("radio")}<span>Tiempo real conectado</span>`;
+    } else {
+      statusEl.innerHTML = `${icon("radio")}<span>Tiempo real: reconectando...</span>`;
+    }
+    // Set data-connected attribute on the inner span for CSS styling
+    const indicator = statusEl.querySelector("span");
+    if (indicator) {
+      indicator.setAttribute("data-connected", String(connected));
+    }
+    renderIcons();
+  }
+}
+
+/**
+ * Handle a new RFP ticket notification received via SSE.
+ * Shows a visual notification in the dashboard and updates the RFP list.
+ */
+function handleRfpTicketCreated(data) {
+  // Show toast notification
+  showRFPNotification(data);
+
+  // Refresh the RFP tickets list to include the new one
+  // (the SSE event comes first, then the list refresh confirms)
+  setTimeout(() => void loadRFPTickets(), 500);
+}
+
+/**
+ * Display a prominent toast/banner notification for new RFP ticket.
+ */
+function showRFPNotification(data) {
+  const existing = document.querySelector(".sse-toast");
+  if (existing) existing.remove();
+
+  const clientName = data.client_name || "Cliente desconocido";
+  const services = Array.isArray(data.services_requested)
+    ? data.services_requested.join(", ")
+    : "—";
+
+  const toast = document.createElement("div");
+  toast.className = "sse-toast sse-toast-visible";
+  toast.setAttribute("role", "alert");
+  toast.innerHTML = `
+    <div class="sse-toast-icon">${icon("zap")}</div>
+    <div class="sse-toast-content">
+      <strong>¡Nueva RFP recibida!</strong>
+      <span class="sse-toast-meta">${escapeHTML(clientName)} · ${escapeHTML(data.ticket_id)}</span>
+      <span class="sse-toast-services">${escapeHTML(services)}</span>
+    </div>
+    <button class="sse-toast-close" type="button" aria-label="Cerrar" data-action="close-toast">${icon("x")}</button>
+  `;
+
+  document.body.appendChild(toast);
+  renderIcons();
+
+  // Auto-dismiss after 8 seconds
+  setTimeout(() => {
+    toast.classList.remove("sse-toast-visible");
+    toast.classList.add("sse-toast-hiding");
+    setTimeout(() => toast.remove(), 400);
+  }, 8000);
+
+  // Close button
+  toast.querySelector(".sse-toast-close")?.addEventListener("click", () => {
+    toast.remove();
+  });
+
+  // Click on toast scrolls to RFP section
+  toast.addEventListener("click", (event) => {
+    if (event.target.closest(".sse-toast-close")) return;
+    document.getElementById("rfp")?.scrollIntoView({ behavior: "smooth" });
+    toast.remove();
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────── */
 const CATEGORIES = ["TECHNICAL", "BILLING", "ACCESS", "HR_QUERY", "COMPLAINT"];
 const STATUSES = ["OPEN", "CLOSED", "DISCARDED"];
 const STATUS_LABELS = {
@@ -247,6 +525,9 @@ function renderResetPassword(token, message = "", messageType = "") {
 }
 
 function renderDashboard() {
+  // Disconnect any previous SSE connection before re-rendering
+  sseDisconnect();
+
   app.className = "layout";
   app.innerHTML = `
     <aside class="sidebar">
@@ -274,7 +555,7 @@ function renderDashboard() {
           <p class="header-copy">Visión diaria de carga, servicio y satisfacción.</p>
         </div>
         <div class="user-controls">
-          <span class="system-status"><span aria-hidden="true"></span>API conectada</span>
+          <span class="system-status"><span aria-hidden="true" data-connected="false"></span>Conectando...</span>
           <button class="secondary-button" type="button" data-action="change-password">${icon("key-round")}<span>Cambiar contraseña</span></button>
         </div>
       </header>
@@ -1090,11 +1371,18 @@ app.addEventListener("click", (event) => {
       renderIcons();
     }
   }
-  if (button.dataset.action === "logout") clearSession();
+  if (button.dataset.action === "logout") {
+    sseDisconnect();
+    clearSession();
+  }
   if (button.dataset.action === "forgot-password") renderForgotPassword();
   if (button.dataset.action === "back-login") renderLogin();
   if (button.dataset.action === "change-password") renderChangePassword();
   if (button.dataset.action === "back-dashboard") renderDashboard();
+  if (button.dataset.action === "close-toast") {
+    const toast = button.closest(".sse-toast");
+    if (toast) toast.remove();
+  }
   if (
     button.dataset.action === "refresh" ||
     button.dataset.action === "retry-list"
@@ -1133,7 +1421,13 @@ async function start() {
   try {
     state.user = await apiRequest("/auth/me");
     renderDashboard();
-    await Promise.all([loadIncidents(), loadSummary()]);
+    await Promise.all([loadIncidents(), loadSummary(), loadRFPTickets()]);
+    // Start SSE connection for real-time notifications
+    sseConnected = false;
+    sseDestroyed = false;
+    sseSeenTicketIds = new Set();
+    sseRetryCount = 0;
+    sseConnect();
   } catch {
     if (state.token)
       clearSession("La sesión no es válida. Inicia sesión nuevamente.");
