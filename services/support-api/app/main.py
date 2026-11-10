@@ -45,6 +45,7 @@ from app.routers.inventory import router as inventory_router
 from app.routers.agent import router as agent_router
 from app.routers.incidents import router as central_incidents_router
 from app.routers.profiles import router as profiles_router
+from app.routers.rfp import router as rfp_router
 from app.routers.suppliers import router as suppliers_router
 from app.routers.users import router as users_router
 from app.user_service import (
@@ -72,6 +73,7 @@ app = FastAPI(title="Nexova Support API", lifespan=lifespan)
 app.include_router(inventory_router)
 app.include_router(agent_router)
 app.include_router(central_incidents_router)
+app.include_router(rfp_router)
 app.include_router(suppliers_router)
 app.include_router(users_router)
 app.include_router(profiles_router)

@@ -46,8 +46,9 @@ def _create_sqlite_fallback() -> object:
     db_dir.mkdir(exist_ok=True)
     db_path = str(db_dir / "inventory.db")
     eng = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
-    # Create tables on first use
+    # Create tables on first use — import all models
     from app.models import Asset, AssetEntry, AssetExit  # noqa: F401
+    from app.rfp_models import DepartmentSection, RFPMetadata, RFPHandoff, RFPTicket  # noqa: F401
 
     SQLModel.metadata.create_all(eng)
     return eng
