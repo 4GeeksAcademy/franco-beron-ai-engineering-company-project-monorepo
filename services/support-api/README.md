@@ -108,6 +108,18 @@ El seeder usa la misma tabla TinyDB `suppliers`, evita duplicados por nombre e i
 
 La recuperación devuelve la misma respuesta tanto si la cuenta existe como si no. Los tokens se guardan hasheados, vencen en 30 minutos y solo se aceptan una vez. El correo se envía a la cuenta interna; no se usa `customer_email` para recuperación.
 
+## Caching y rendimiento
+
+El middleware `api.timing` registra método, path, status y duración en milisegundos; omite query strings. Se cachean `GET /inventory/products` (30 s) y `GET /api/incidents/summary` (15 s), con claves aisladas por usuario. Las altas de activos y movimientos invalidan el catálogo; la creación y actualización de incidencias invalidan el resumen. La caché es local al proceso y no sustituye Redis si se despliegan varios workers.
+
+Para comparar peticiones frías y calientes sin conectarse a Supabase ni persistir registros sintéticos, ejecuta desde esta carpeta:
+
+```bash
+python -m scripts.benchmark_caching
+```
+
+El script usa SQLite en memoria y datos sintéticos. El análisis de endpoints, el volumen y las mediciones están en [`docs/CACHING_REPORT.md`](../../docs/CACHING_REPORT.md).
+
 ## Pruebas
 
 ### Manejo de errores

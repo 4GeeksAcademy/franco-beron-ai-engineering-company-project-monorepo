@@ -9,7 +9,7 @@ Each subfolder inside `services/` must correspond to **one specific service** (f
 
 ## Current services
 
-- [`support-api/`](./support-api/README.md): FastAPI API for authentication, support, inventory, and the Nexova supplier directory. It uses TinyDB for users, profiles, tickets, and suppliers, plus SQLModel/Supabase for inventory.
+- [`support-api/`](./support-api/README.md): FastAPI API for authentication, support, inventory, and the Nexova supplier directory. It uses TinyDB for users, profiles, tickets, and suppliers, SQLModel/Supabase for inventory, and process-local TTL caching for selected read endpoints.
 
 ## Docker development
 

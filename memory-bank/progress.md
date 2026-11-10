@@ -260,6 +260,27 @@
 - Limitaciones: sin navegador instalado para prueba visual de carga/error/reintento; Pylance sigue indicando importación `app.config` no resuelta en el script de raíz aunque su ejecución y tests resuelven la ruta. La utilidad pandas requiere su dependencia opcional y no se ejecutó con un CSV real.
 - Cambios de esta ampliación sin commit ni push; no se modificaron `.env`, configuración Docker, esquema de base de datos ni archivos críticos.
 
+## Optimización de rendimiento y caching (2026-11-10)
+
+- Se creó `feature/caching-optimisation` desde un working tree limpio, siguiendo la rama indicada por el README del reto.
+- Se añadió middleware `api.timing` que registra método, path, status y milisegundos sin query strings.
+- Se cachean `GET /inventory/products` (30 s) y `GET /api/incidents/summary` (15 s). Las claves incluyen `doc_id` y los filtros; altas de activos/movimientos y escrituras de incidencias invalidan sus respectivos namespaces. Las generaciones impiden repoblar con una lectura obsoleta iniciada antes de invalidar. La caché está limitada a 256 claves por proceso.
+- En el backoffice, el formulario opcional de proveedores y la tabla del historial usan `next/dynamic`; el catálogo memoiza métricas de stock con `useMemo`.
+- Se añadió `services/support-api/scripts/benchmark_caching.py`, que usa TestClient, SQLite en memoria y datos sintéticos variados (250 activos, 10.000 movimientos y 200.000 incidencias), sin conectar a Supabase ni persistir filas sintéticas.
+- Medianas locales frías/calientes: `/inventory/products` 136,74/5,93 ms y `/api/incidents/summary` 92,46/4,98 ms. Se documentó la matriz de 35 endpoints, trade-offs, TTLs, invalidación, privacidad y límites multiworker en `docs/CACHING_REPORT.md`.
+- Documentación operativa actualizada en `services/support-api/README.md`, `services/README.md`, `uis/backoffice/README.md` y contexto técnico.
+
+### Validaciones
+
+- `python -m pytest -q tests/test_central_incidents.py tests/test_error_handling.py`: 21 pruebas aprobadas.
+- `python -m unittest discover -s tests`: 21 pruebas aprobadas.
+- `python -m scripts.benchmark_caching`: comprobaciones de aislamiento de usuario, TTL, invalidación y carreras aprobadas; benchmark ejecutado.
+- `python -m compileall -q app scripts`: aprobado.
+- `npx next build` en `uis/backoffice`: compilación aprobada.
+- `get_errors`: sin errores en archivos Python y frontend modificados; `git diff --check`: aprobado.
+- No se usó tráfico de producción ni se ejecutó React Profiler; las frecuencias y el beneficio de `useMemo` quedan identificados como estimaciones en el informe. La caché en memoria no comparte invalidaciones entre workers.
+- Advertencias de verificación: deprecación de `httpx` en Starlette TestClient y un `ResourceWarning` sobre `db.json`; no impidieron las pruebas.
+
 - Se creó la rama `feature/error-handling` desde `feature/gestor-incidencias` para aislar la auditoría de resiliencia sin mezclar trabajo funcional nuevo.
 - Se revisó la referencia externa de la auditoría y se aplicaron los patrones requeridos: manejo de errores a nivel de operación, mensajes legibles para usuario y salidas seguras en scripts.
 - Se reforzó el manejo general de excepciones en `services/support-api/app/main.py` con registro de errores en backend y respuesta JSON sin revelar trazas, rutas internas ni secretos.

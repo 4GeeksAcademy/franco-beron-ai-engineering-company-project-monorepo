@@ -2,6 +2,7 @@ from app.error_handling import operation_errors
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 import logging
+import time
 
 from fastapi import (
     Depends,
@@ -73,6 +74,24 @@ app.include_router(suppliers_router)
 app.include_router(users_router)
 app.include_router(profiles_router)
 logger = logging.getLogger(__name__)
+timing_logger = logging.getLogger("api.timing")
+
+
+@app.middleware("http")
+async def timing_middleware(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    timing_logger.info(
+        "%s %s -> %s | %.1fms",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[BACKOFFICE_ORIGIN],

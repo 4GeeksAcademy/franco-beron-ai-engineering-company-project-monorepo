@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, func, select
 
 from app.auth import ensure_user_uuid, get_current_user
+from app.cache import response_cache, user_cache_scope
 from app.database import get_db
 from app.models import Asset, AssetEntry, AssetExit
 from app.schemas import (
@@ -26,6 +27,8 @@ router = APIRouter(
 )
 DatabaseSession = Annotated[Session, Depends(get_db)]
 AuthenticatedUser = Annotated[dict, Depends(get_current_user)]
+PRODUCTS_CACHE_NAMESPACE = "inventory-products"
+PRODUCTS_CACHE_TTL_SECONDS = 30
 
 
 def current_stock(session: Session, asset_id: int) -> int:
@@ -57,12 +60,36 @@ def asset_response(session: Session, asset: Asset) -> dict:
 def list_products(
     session: DatabaseSession,
     office: Office | None = Query(default=None),
+    current_user=Depends(get_current_user),
 ):
     with operation_errors(session):
+        user_scope = user_cache_scope(current_user)
+        cache_key = (
+            PRODUCTS_CACHE_NAMESPACE,
+            user_scope,
+            office.value if office is not None else None,
+        )
+        cache_generation = response_cache.generation(PRODUCTS_CACHE_NAMESPACE)
+        if user_scope is not None:
+            cached_products = response_cache.get(cache_key)
+            if cached_products is not None:
+                return cached_products
+
         statement = select(Asset).order_by(Asset.id)
         if office is not None:
             statement = statement.where(Asset.office == office)
-        return [asset_response(session, asset) for asset in session.exec(statement).all()]
+        products = [
+            asset_response(session, asset)
+            for asset in session.exec(statement).all()
+        ]
+        if user_scope is not None:
+            response_cache.set(
+                cache_key,
+                products,
+                ttl_seconds=PRODUCTS_CACHE_TTL_SECONDS,
+                expected_generation=cache_generation,
+            )
+        return products
 
 
 @router.post(
@@ -83,6 +110,7 @@ def create_product(
         session.add(asset)
         session.commit()
         session.refresh(asset)
+        response_cache.invalidate(PRODUCTS_CACHE_NAMESPACE)
         return asset_response(session, asset)
 
 
@@ -116,6 +144,7 @@ def create_inbound_order(
         session.add(entry)
         session.commit()
         session.refresh(entry)
+        response_cache.invalidate(PRODUCTS_CACHE_NAMESPACE)
         return entry
 
 
@@ -155,6 +184,7 @@ def create_outbound_order(
         session.add(exit_order)
         session.commit()
         session.refresh(exit_order)
+        response_cache.invalidate(PRODUCTS_CACHE_NAMESPACE)
         return exit_order
 
 

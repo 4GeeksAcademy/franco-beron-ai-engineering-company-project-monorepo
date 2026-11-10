@@ -1,3 +1,4 @@
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
 import InventoryShell from "../../components/InventoryShell";
@@ -31,6 +32,13 @@ const EMPTY_FORM = {
   contact_email: "",
   notes: "",
 };
+const SupplierForm = dynamic(() => import("../../components/SupplierForm"), {
+  loading: () => (
+    <div className="inventory-state" role="status">
+      Cargando formulario de proveedor...
+    </div>
+  ),
+});
 
 function categoryLabel(value) {
   return CATEGORIES.find(([category]) => category === value)?.[1] ?? value;
@@ -285,130 +293,15 @@ export default function SuppliersPage() {
       )}
 
       {formOpen && (
-        <section
-          className="supplier-form-panel"
-          aria-labelledby="supplier-form-title"
-        >
-          <div className="supplier-form-heading">
-            <div>
-              <p className="inventory-eyebrow">Alta de proveedor</p>
-              <h2 id="supplier-form-title">Datos comerciales</h2>
-            </div>
-          </div>
-          <form className="supplier-form" onSubmit={submitSupplier}>
-            <div className="supplier-form-grid">
-              <label>
-                Nombre comercial
-                <input
-                  name="name"
-                  value={form.name}
-                  onChange={updateForm}
-                  required
-                  maxLength="160"
-                />
-              </label>
-              <label>
-                País del contrato
-                <select
-                  name="country"
-                  value={form.country}
-                  onChange={updateForm}
-                >
-                  <option value="Spain">Spain</option>
-                  <option value="USA">USA</option>
-                </select>
-              </label>
-              <label>
-                Tarifa mensual
-                <input
-                  name="monthly_rate"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={form.monthly_rate}
-                  onChange={updateForm}
-                  required
-                />
-              </label>
-              <label>
-                Moneda
-                <input
-                  value={form.country === "Spain" ? "EUR" : "USD"}
-                  readOnly
-                />
-              </label>
-              <label>
-                Estado inicial
-                <select name="status" value={form.status} onChange={updateForm}>
-                  <option value="active">Activo</option>
-                  <option value="suspended">Suspendido</option>
-                </select>
-              </label>
-              <label>
-                Renovación de contrato
-                <input
-                  name="contract_renewal_date"
-                  type="date"
-                  value={form.contract_renewal_date}
-                  onChange={updateForm}
-                />
-              </label>
-              <label>
-                Email de contacto
-                <input
-                  name="contact_email"
-                  type="email"
-                  autoComplete="email"
-                  value={form.contact_email}
-                  onChange={updateForm}
-                />
-              </label>
-              <label className="supplier-notes-field">
-                Notas internas
-                <textarea
-                  name="notes"
-                  rows="2"
-                  value={form.notes}
-                  onChange={updateForm}
-                />
-              </label>
-            </div>
-            <fieldset className="supplier-category-fieldset">
-              <legend>Categorías de servicio</legend>
-              <div className="supplier-category-options">
-                {CATEGORIES.map(([value, label]) => (
-                  <label className="supplier-category-option" key={value}>
-                    <input
-                      type="checkbox"
-                      checked={form.categories.includes(value)}
-                      onChange={() => toggleCategory(value)}
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            {formError && (
-              <p className="supplier-error" role="alert">
-                {formError}
-              </p>
-            )}
-            <div className="supplier-form-actions">
-              <p className="inventory-muted">
-                La fecha de actualización la asigna el sistema.
-              </p>
-              <button
-                className="primary-button"
-                type="submit"
-                disabled={saving}
-              >
-                {saving ? <Icon name="loader-circle" /> : <Icon name="save" />}
-                <span>{saving ? "Guardando..." : "Guardar proveedor"}</span>
-              </button>
-            </div>
-          </form>
-        </section>
+        <SupplierForm
+          categories={CATEGORIES}
+          form={form}
+          onChange={updateForm}
+          onCategoryToggle={toggleCategory}
+          onSubmit={submitSupplier}
+          error={formError}
+          saving={saving}
+        />
       )}
 
       <section
