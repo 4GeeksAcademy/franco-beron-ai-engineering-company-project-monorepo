@@ -318,3 +318,4 @@
 - Pruebas HTTP del agente: 4 aprobadas, incluida autenticación obligatoria, acceso del propietario al trace y saneamiento de errores. Suite completa del servicio: 119 pruebas y 3 subtests aprobados; queda una advertencia deprecada de Starlette.
 - `docker compose config -q`, `docker compose build backend` y `git diff --check` aprobados.
 - Limitación: `MemorySaver` y el registro de traces son locales al proceso; se pierden al reiniciar y no se comparten entre workers. No se conectó LangSmith ni otro servicio externo.
+- Entrega: commit `976d8e3` y PR #14 hacia `main`, con etiqueta `langgraph-agent-base`.
