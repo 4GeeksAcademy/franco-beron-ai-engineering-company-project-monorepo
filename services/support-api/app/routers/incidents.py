@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from tinydb import Query as TinyQuery
 
 from app.auth import get_current_user
+from app.cache import response_cache, user_cache_scope
 from app.db import central_incidents
 from app.incident_rules import (
     INCIDENT_BRANCHES,
@@ -43,6 +44,8 @@ STATUS_TRANSITIONS = {
     "resolved": set(),
     "discarded": set(),
 }
+SUMMARY_CACHE_NAMESPACE = "central-incident-summary"
+SUMMARY_CACHE_TTL_SECONDS = 15
 
 
 def _public_incident(incident) -> dict:
@@ -109,6 +112,7 @@ def create_incident(
                 "reported_by_user_id": current_user.doc_id,
             }
         )
+        response_cache.invalidate(SUMMARY_CACHE_NAMESPACE)
         return _public_incident(central_incidents.get(doc_id=incident_id))
 
 
@@ -130,8 +134,16 @@ def list_incidents(
 
 
 @router.get("/summary", response_model=CentralIncidentSummary)
-def incidents_summary():
+def incidents_summary(current_user=Depends(get_current_user)):
     with operation_errors():
+        user_scope = user_cache_scope(current_user)
+        cache_key = (SUMMARY_CACHE_NAMESPACE, user_scope)
+        cache_generation = response_cache.generation(SUMMARY_CACHE_NAMESPACE)
+        if user_scope is not None:
+            cached_summary = response_cache.get(cache_key)
+            if cached_summary is not None:
+                return cached_summary
+
         records = central_incidents.all()
         totals = {
             field: {value: 0 for value in values}
@@ -147,7 +159,15 @@ def incidents_summary():
             totals["by_category"][incident["category"]] += 1
             totals["by_origin"][incident["origin"]] += 1
             totals["by_branch"][incident["branch"]] += 1
-        return {"total": len(records), **totals}
+        summary = {"total": len(records), **totals}
+        if user_scope is not None:
+            response_cache.set(
+                cache_key,
+                summary,
+                ttl_seconds=SUMMARY_CACHE_TTL_SECONDS,
+                expected_generation=cache_generation,
+            )
+        return summary
 
 
 @router.get("/{incident_id}", response_model=CentralIncidentPublic)
@@ -190,4 +210,5 @@ def update_incident_status(
             },
             doc_ids=[incident_id],
         )
+        response_cache.invalidate(SUMMARY_CACHE_NAMESPACE)
         return _public_incident(central_incidents.get(doc_id=incident_id))

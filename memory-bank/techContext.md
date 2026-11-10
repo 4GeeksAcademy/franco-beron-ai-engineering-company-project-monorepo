@@ -90,3 +90,4 @@ Como no hay runner global en raíz, los comandos se ejecutan por proyecto o medi
 - El backoffice sirve en `http://localhost:3001/`; en Docker usa un proxy del mismo origen hacia la API para evitar exponer nombres internos al navegador.
 - La base inicia sin históricos hasta disponer del CSV real de Nexova.
 - Se incorpora `memory-bank/` y configuración `.agents/` para continuidad operativa entre sesiones.
+- La API registra latencia por request con `api.timing` y usa caché TTL en proceso para el catálogo de inventario (30 s) y el resumen de incidencias centrales (15 s). Las claves incluyen `doc_id`; las escrituras relacionadas invalidan el namespace. La invalidación es local a cada worker.

@@ -104,6 +104,12 @@ NEXT_PUBLIC_INVENTORY_API_URL=http://127.0.0.1:8001
 
 Ese archivo está ignorado por Git. La URL solo configura el endpoint del backend; nunca coloques tokens ni credenciales de Supabase en variables `NEXT_PUBLIC_*`.
 
+## Rendimiento del backoffice
+
+- El formulario opcional de alta de proveedores se carga al abrirse; la tabla de movimientos se carga cuando hay resultados que mostrar.
+- El catálogo memoiza en un solo recorrido las unidades totales, los activos con stock bajo y los agotados; se recalcula cuando cambia el listado.
+- El análisis y las mediciones locales de la API están en [`docs/CACHING_REPORT.md`](../../docs/CACHING_REPORT.md).
+
 ## Auditoría de errores
 
 - Los clientes de inventario, proveedores e incidencias capturan fallos de red y JSON inválido y tienen un timeout de 15 segundos. Los mensajes no muestran códigos HTTP ni texto interno del servidor.

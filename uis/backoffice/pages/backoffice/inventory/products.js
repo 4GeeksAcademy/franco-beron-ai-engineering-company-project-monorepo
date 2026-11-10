@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import InventoryShell from "../../../components/InventoryShell";
 import { getProducts } from "../../../lib/inventory";
@@ -11,19 +11,24 @@ const LOW_STOCK_THRESHOLD = 5;
 function StockStatus({ quantity }) {
   if (quantity === 0) {
     return (
-      <span className="stock-badge stock-empty"><Icon name="circle-x" />Agotado</span>
+      <span className="stock-badge stock-empty">
+        <Icon name="circle-x" />
+        Agotado
+      </span>
     );
   }
   if (quantity < LOW_STOCK_THRESHOLD) {
     return (
       <span className="stock-badge stock-low">
-        <Icon name="triangle-alert" />Stock bajo
+        <Icon name="triangle-alert" />
+        Stock bajo
       </span>
     );
   }
   return (
     <span className="stock-badge stock-healthy">
-      <Icon name="circle-check" />Saludable
+      <Icon name="circle-check" />
+      Saludable
     </span>
   );
 }
@@ -49,9 +54,20 @@ export default function InventoryProductsPage() {
     void loadProducts();
   }, []);
 
-  const lowStockCount = products.filter(
-    (product) => product.current_stock < LOW_STOCK_THRESHOLD,
-  ).length;
+  const stockMetrics = useMemo(
+    () =>
+      products.reduce(
+        (metrics, product) => {
+          const quantity = product.current_stock ?? 0;
+          metrics.totalUnits += quantity;
+          if (quantity === 0) metrics.outOfStock += 1;
+          else if (quantity < LOW_STOCK_THRESHOLD) metrics.lowStock += 1;
+          return metrics;
+        },
+        { totalUnits: 0, lowStock: 0, outOfStock: 0 },
+      ),
+    [products],
+  );
 
   return (
     <InventoryShell
@@ -115,11 +131,16 @@ export default function InventoryProductsPage() {
       {status === "ready" && products.length > 0 && (
         <>
           <div className="inventory-summary-line">
-            <span>{products.length} activos</span>
-            <span className="stock-legend">
-              <Icon name="triangle-alert" /> {lowStockCount} con menos de{" "}
-              {LOW_STOCK_THRESHOLD} unidades
+            <span>
+              {products.length} activos · {stockMetrics.totalUnits} unidades
             </span>
+            <span className="stock-legend">
+              <Icon name="triangle-alert" /> {stockMetrics.lowStock} con menos
+              de {LOW_STOCK_THRESHOLD} unidades
+            </span>
+            {stockMetrics.outOfStock > 0 && (
+              <span>{stockMetrics.outOfStock} agotados</span>
+            )}
           </div>
           <div className="inventory-table-wrap">
             <table className="inventory-table">
