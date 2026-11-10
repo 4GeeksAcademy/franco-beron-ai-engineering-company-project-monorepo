@@ -42,6 +42,7 @@ from app.schemas import (
     ResetPasswordRequest,
 )
 from app.routers.inventory import router as inventory_router
+from app.routers.agent import router as agent_router
 from app.routers.incidents import router as central_incidents_router
 from app.routers.profiles import router as profiles_router
 from app.routers.suppliers import router as suppliers_router
@@ -69,6 +70,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Nexova Support API", lifespan=lifespan)
 app.include_router(inventory_router)
+app.include_router(agent_router)
 app.include_router(central_incidents_router)
 app.include_router(suppliers_router)
 app.include_router(users_router)

@@ -26,7 +26,7 @@ services:
     build:
       context: .
       dockerfile: services/Dockerfile
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --reload-dir /app/support-api --reload-dir /app/packages/shared
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --reload-dir /app/support-api --reload-dir /app/packages/shared --reload-dir /app/data/pipelines/nexova_rag
     working_dir: /app/support-api
     environment:
       JWT_SECRET: ${JWT_SECRET}
@@ -42,6 +42,8 @@ services:
     volumes:
       - ./services/support-api:/app/support-api
       - ./packages/shared:/app/packages/shared
+      - ./data/pipelines/nexova_rag:/app/data/pipelines/nexova_rag
+      - ./CONTEXT.md:/app/CONTEXT.md:ro
     healthcheck:
       test:
         - CMD

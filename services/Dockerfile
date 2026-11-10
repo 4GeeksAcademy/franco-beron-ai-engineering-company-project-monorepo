@@ -10,6 +10,10 @@ RUN pip install --no-cache-dir uv
 COPY services/support-api/requirements.txt ./requirements.txt
 RUN uv pip install --system --no-cache -r requirements.txt
 
+COPY data/pipelines/nexova_rag /app/data/pipelines/nexova_rag
+COPY CONTEXT.md /app/CONTEXT.md
+RUN uv pip install --system --no-cache -e /app/data/pipelines/nexova_rag
+
 COPY services/support-api/ .
 COPY packages/shared/incident_validation.py /app/packages/shared/incident_validation.py
 

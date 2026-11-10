@@ -306,3 +306,16 @@
 - Diagnósticos del editor en `src/app.py`: sin errores; `git diff --check`: aprobado.
 - Limitación local: VS Code seleccionó el `.venv` de `services/support-api` para el kernel; la ejecución reproducible de producción usa el `.venv` dedicado del pipeline. No se usó GPU.
 - La rama queda sin commit ni push; no se creó PR en esta tarea.
+
+## LangGraph agent base (2026-11-10)
+
+- Se trabajó en `feature/lang-graph-part1` y se implementó `data/pipelines/nexova_rag/`, un RAG determinista y local sobre hechos versionados en `CONTEXT.md`, con `setup`, `embed`, `retrieve`, `generate_answer` y `query`.
+- Se añadió el grafo LangGraph con estado explícito, validación de pregunta, recuperación y generación separadas, rutas condicionales para entrada vacía/sin contexto, `MemorySaver` y traces consultables por UUID detrás de endpoints JWT.
+- Se configuró la dependencia local editable, se empaquetó el módulo en Docker mediante una excepción acotada en `.dockerignore`, y se documentaron endpoints y evals.
+- Se añadió `.vscode/settings.json` con `python.analysis.extraPaths` para `data/pipelines` y `services/support-api`; así Pylance resuelve el paquete editable en Python 3.12. Verificación: `reportMissingImports` desapareció de `agent_graph.py`.
+- La guía de instalación local del servicio usa `uv sync --locked` para instalar también el paquete local `nexova-rag` declarado en `pyproject.toml`.
+- Evals offline: 4 aprobados, cubren orden de nodos, fallback sin evidencia, pregunta vacía y anclaje del SLA a `CONTEXT.md` (24 horas comprometidas frente a 48 actuales).
+- Pruebas HTTP del agente: 4 aprobadas, incluida autenticación obligatoria, acceso del propietario al trace y saneamiento de errores. Suite completa del servicio: 119 pruebas y 3 subtests aprobados; queda una advertencia deprecada de Starlette.
+- `docker compose config -q`, `docker compose build backend` y `git diff --check` aprobados.
+- Limitación: `MemorySaver` y el registro de traces son locales al proceso; se pierden al reiniciar y no se comparten entre workers. No se conectó LangSmith ni otro servicio externo.
+- Entrega: commit `976d8e3` y PR #14 hacia `main`, con etiqueta `langgraph-agent-base`.
