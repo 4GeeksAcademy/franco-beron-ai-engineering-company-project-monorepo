@@ -1,0 +1,85 @@
+{
+    "known_sla": {
+        "question": "¿Cuál es el SLA comprometido con clientes?",
+        "trace": [
+            {
+                "node": "receive_question",
+                "output": {
+                    "valid": true,
+                    "length": 42
+                }
+            },
+            {
+                "node": "retrieve",
+                "output": {
+                    "count": 1,
+                    "chunks": [
+                        {
+                            "source": "CONTEXT.md",
+                            "section": "Tu empresa",
+                            "score": 0.2981
+                        }
+                    ]
+                }
+            },
+            {
+                "node": "generate_answer",
+                "output": {
+                    "answer_contains": [
+                        "24 horas",
+                        "48 horas",
+                        "Fuente: CONTEXT.md"
+                    ]
+                }
+            }
+        ],
+        "answer": "El SLA promedio comprometido con clientes es de 24 horas; actualmente el promedio está en 48 horas. Fuente: CONTEXT.md"
+    },
+    "unknown_policy": {
+        "question": "¿Cuántos días de vacaciones tiene cada agente?",
+        "trace": [
+            {
+                "node": "receive_question",
+                "output": {
+                    "valid": true,
+                    "length": 46
+                }
+            },
+            {
+                "node": "retrieve",
+                "output": {
+                    "count": 0,
+                    "chunks": []
+                }
+            },
+            {
+                "node": "no_context",
+                "output": {
+                    "answer": "No tengo información suficiente en la base de conocimiento de Nexova.",
+                    "reason": "no_matching_context"
+                }
+            }
+        ],
+        "answer": "No tengo información suficiente en la base de conocimiento de Nexova."
+    },
+    "empty_question": {
+        "question": "   ",
+        "trace": [
+            {
+                "node": "receive_question",
+                "output": {
+                    "valid": false,
+                    "length": 3
+                }
+            },
+            {
+                "node": "invalid_question",
+                "output": {
+                    "answer": "La pregunta no puede estar vacía.",
+                    "reason": "empty_question"
+                }
+            }
+        ],
+        "answer": "La pregunta no puede estar vacía."
+    }
+}

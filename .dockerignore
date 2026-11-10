@@ -8,3 +8,6 @@
 **/db.json
 **/tests
 data/**
+!data/pipelines/
+!data/pipelines/nexova_rag/
+!data/pipelines/nexova_rag/**

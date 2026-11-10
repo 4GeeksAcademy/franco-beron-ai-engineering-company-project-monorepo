@@ -27,12 +27,10 @@ La API queda disponible en `http://localhost:8001` con recarga en caliente. El b
 
 ## Ejecución sin Docker
 
-Desde esta carpeta:
+Requiere `uv`. Desde esta carpeta:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync --locked
 cp ../../.env.example .env
 ```
 
@@ -77,6 +75,8 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 - `GET /api/incidents/summary`
 - `GET /api/incidents/{ticket_id}`
 - `PATCH /api/incidents/{ticket_id}/status`
+- `POST /agent/query` (requiere JWT; ejecuta el grafo LangGraph y devuelve respuesta, trace y checkpoint)
+- `GET /agent/traces/{thread_id}` (requiere JWT del propietario del trace)
 - `POST /suppliers`
 - `GET /suppliers?country=Spain&category=ats_software`
 - `GET /suppliers/{id}`
@@ -85,6 +85,8 @@ Swagger local: `http://127.0.0.1:8001/docs`.
 - `DELETE /suppliers/{id}`
 
 Todos los endpoints de `/users`, `/profiles`, `/suppliers`, `/inventory` e incidencias requieren autenticación, salvo `POST /users` (registro público). Las otras excepciones públicas son `/health`, `/auth/login`, `/auth/forgot-password` y `/auth/reset-password`.
+
+El agente LangGraph reutiliza el paquete `data/pipelines/nexova_rag`, que recupera evidencia de `CONTEXT.md` y genera respuestas extractivas con fuente. Los traces y checkpoints usan almacenamiento en memoria: se pueden consultar durante la vida del proceso, pero se pierden al reiniciarlo y no se comparten entre workers.
 
 La clave de firma se lee desde `JWT_SECRET`; la expiración se configura con `ACCESS_TOKEN_EXPIRE_MINUTES` (se conserva `ACCESS_TOKEN_MINUTES` como alias compatible). Los JWT llevan el ID de documento TinyDB en `sub`. Las cuentas legacy se migran al autenticarse: `password_hash` pasa a `hashed_password` y `name` se mueve a su perfil. Las credenciales y perfiles no se guardan en PostgreSQL/Supabase.
 
@@ -134,4 +136,10 @@ Las pruebas de errores usan almacenamiento y envío simulados, sin escribir en S
 
 ```bash
 python -m unittest discover -s tests
+```
+
+Los tests del agente y los evals offline se ejecutan desde `services/support-api/` con:
+
+```bash
+uv run pytest tests/test_agent.py ../../tests/pipelines
 ```
