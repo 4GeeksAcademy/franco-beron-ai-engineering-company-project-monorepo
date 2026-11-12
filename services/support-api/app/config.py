@@ -8,7 +8,8 @@ SERVICE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(SERVICE_DIR / ".env")
 
 JWT_SECRET = os.getenv("JWT_SECRET", "")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+# Pinned to HS256 — DO NOT override via environment variable (CVE: algorithm confusion attack)
+JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(
     os.getenv(
         "ACCESS_TOKEN_EXPIRE_MINUTES",

@@ -155,15 +155,23 @@ async def upload_rfp(
             detail="Solo se aceptan archivos PDF.",
         )
 
+    # Enforce file size limit (10 MB) to prevent DoS via memory exhaustion
+    MAX_FILE_SIZE = 10 * 1024 * 1024
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="El archivo excede el tamaño máximo permitido de 10 MB.",
+        )
+
     # Generate ticket_id
     ticket_id = str(uuid4())[:8]
 
-    # Save file
-    safe_filename = f"{ticket_id}_{file.filename}"
+    # Save file — sanitize filename to prevent path traversal
+    safe_filename = f"{ticket_id}_{os.path.basename(file.filename)}"
     pdf_path = RAW_DIR / safe_filename
 
     try:
-        content = await file.read()
         pdf_path.write_bytes(content)
         logger.info("PDF saved: %s (%d bytes)", pdf_path, len(content))
     except Exception as exc:
@@ -180,6 +188,7 @@ async def upload_rfp(
                 status=TicketStatus.ANALIZANDO,
                 raw_pdf_path=str(pdf_path),
                 pdf_filename=file.filename,
+                owner_user_id=current_user.doc_id,
             )
             session.add(ticket)
             session.commit()
@@ -232,6 +241,26 @@ def get_rfp_status(
     """
     from data.pipelines.rfp_intake.graph import get_ticket_status
 
+    role = current_user.get("role", "user")
+    if role != "admin":
+        # Non-admin users can only see their own tickets
+        try:
+            with next(get_db()) as session:
+                ticket = session.query(RFPTicket).filter(RFPTicket.ticket_id == ticket_id).first()
+                if ticket is None or ticket.owner_user_id != current_user.doc_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Ticket {ticket_id} no encontrado.",
+                    )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error("Failed to check RFP ticket ownership: %s", exc)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error al verificar el ticket RFP.",
+            )
+
     status_data = get_ticket_status(ticket_id)
     if status_data is None:
         raise HTTPException(
@@ -249,8 +278,12 @@ def list_rfp_tickets(
     """List all RFP tickets ordered by creation date (newest first)."""
     try:
         with next(get_db()) as session:
+            role = current_user.get("role", "user")
+            query = session.query(RFPTicket)
+            if role != "admin":
+                query = query.filter(RFPTicket.owner_user_id == current_user.doc_id)
             tickets = (
-                session.query(RFPTicket)
+                query
                 .order_by(RFPTicket.created_at.desc())
                 .limit(50)
                 .all()

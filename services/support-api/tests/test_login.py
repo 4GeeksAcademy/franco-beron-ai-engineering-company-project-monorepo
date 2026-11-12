@@ -8,15 +8,22 @@ from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 from app.schemas import LoginRequest, LoginResponse
 from app.main import login
 
 
+@pytest.fixture
+def mock_request():
+    """Minimal Request stub needed by slowapi-decorated endpoints."""
+    return Request(scope={"type": "http", "method": "POST", "path": "/auth/login", "headers": [], "query_string": b""})
+
+
 class TestLoginHappyPath:
     """Camino feliz — credenciales válidas."""
 
-    def test_login_returns_token_and_user(self, fake_user, sample_password):
+    def test_login_returns_token_and_user(self, fake_user, sample_password, mock_request):
         """Usuario activo con contraseña correcta recibe token + datos."""
         payload = LoginRequest.model_construct(
             email=fake_user["email"],
@@ -32,13 +39,13 @@ class TestLoginHappyPath:
                 "role": fake_user["role"],
             }),
         ):
-            result = login(payload)
+            result = login(payload, mock_request)
 
         assert result["access_token"] == "jwt-token"
         assert result["token_type"] == "bearer"
         assert result["user"]["id"] == fake_user.doc_id
 
-    def test_login_returns_valid_login_response_schema(self, fake_user, sample_password):
+    def test_login_returns_valid_login_response_schema(self, fake_user, sample_password, mock_request):
         """El resultado de login es compatible con LoginResponse."""
         payload = LoginRequest.model_construct(
             email=fake_user["email"],
@@ -53,7 +60,7 @@ class TestLoginHappyPath:
                 "role": "user",
             }),
         ):
-            result = login(payload)
+            result = login(payload, mock_request)
         # Verifica que el schema no lance error
         LoginResponse.model_validate(result)
 
@@ -61,8 +68,8 @@ class TestLoginHappyPath:
 class TestLoginEdgeCases:
     """Casos límite — usuarios inactivos, contraseñas en el límite."""
 
-    def test_login_inactive_user_returns_401(self, fake_inactive_user, sample_password):
-        """Usuario con is_active=False recibe 401 genérico."""
+    def test_login_inactive_user_returns_401(self, fake_inactive_user, sample_password, mock_request):
+        """Usuario inactivo recibe 401 genérico."""
         payload = LoginRequest.model_construct(
             email=fake_inactive_user["email"],
             password=sample_password,
@@ -72,7 +79,7 @@ class TestLoginEdgeCases:
             patch("app.main.verify_password", return_value=True),
         ):
             with pytest.raises(HTTPException) as exc_info:
-                login(payload)
+                login(payload, mock_request)
 
         assert exc_info.value.status_code == 401
         assert "Email o contraseña incorrectos" in exc_info.value.detail
@@ -99,7 +106,7 @@ class TestLoginEdgeCases:
 class TestLoginFailureModes:
     """Modos de fallo — credenciales inválidas, tokens malformados."""
 
-    def test_login_wrong_password(self, fake_user):
+    def test_login_wrong_password(self, fake_user, mock_request):
         """Contraseña incorrecta → 401."""
         payload = LoginRequest.model_construct(
             email=fake_user["email"],
@@ -110,12 +117,12 @@ class TestLoginFailureModes:
             patch("app.main.verify_password", return_value=False),
         ):
             with pytest.raises(HTTPException) as exc_info:
-                login(payload)
+                login(payload, mock_request)
 
         assert exc_info.value.status_code == 401
         assert "Email o contraseña incorrectos" in exc_info.value.detail
 
-    def test_login_nonexistent_email(self):
+    def test_login_nonexistent_email(self, mock_request):
         """Email no registrado → 401 (mismo mensaje que contraseña incorrecta)."""
         payload = LoginRequest.model_construct(
             email="unknown@example.com",
@@ -123,7 +130,7 @@ class TestLoginFailureModes:
         )
         with patch("app.main.get_user_by_email", return_value=None):
             with pytest.raises(HTTPException) as exc_info:
-                login(payload)
+                login(payload, mock_request)
 
         assert exc_info.value.status_code == 401
         assert "Email o contraseña incorrectos" in exc_info.value.detail

@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -6,6 +7,8 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.config import SUPABASE_DATABASE_URL
 from app.error_handling import operation_errors
+
+logger = logging.getLogger(__name__)
 
 
 def _sqlalchemy_url(database_url: str) -> str:
@@ -33,9 +36,7 @@ def _create_engine() -> None | object:
             pass
         return eng
     except Exception:
-        import logging
-
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Supabase no disponible, usando SQLite local como fallback."
         )
         return _create_sqlite_fallback()
@@ -84,9 +85,7 @@ def initialize_inventory_database() -> None:
             if existing is None:
                 seed_inventory(session, Asset, AssetEntry, AssetExit)
     except Exception as exc:
-        import logging
-
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Inventario (Supabase) no disponible, se salta inicialización: %s",
             exc,
         )

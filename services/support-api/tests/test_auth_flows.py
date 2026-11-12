@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from fastapi import HTTPException
+from starlette.requests import Request
 
 from app.main import change_password, forgot_password, reset_password
 from app.schemas import (
@@ -17,6 +18,14 @@ class FakeDocument(dict):
     def __init__(self, doc_id, **values):
         super().__init__(values)
         self.doc_id = doc_id
+
+
+def _req():
+    """Minimal starlette Request stub for slowapi-decorated endpoints."""
+    return Request(scope={
+        "type": "http", "method": "POST", "path": "/auth/login",
+        "headers": [], "query_string": b"",
+    })
 
 
 class PasswordResetTests(unittest.TestCase):
@@ -75,14 +84,16 @@ class PasswordResetTests(unittest.TestCase):
             patch("app.main.send_password_reset_email") as send_email,
         ):
             forgot_result = forgot_password(
-                ForgotPasswordRequest.model_construct(email="")
+                ForgotPasswordRequest.model_construct(email=""),
+                _req(),
             )
             raw_token = send_email.call_args.kwargs["token"]
             reset_result = reset_password(
                 ResetPasswordRequest.model_construct(
                     token=raw_token,
                     new_password="new-password-value",
-                )
+                ),
+                _req(),
             )
 
             self.assertIn("Si la cuenta está registrada", forgot_result["message"])
@@ -99,7 +110,8 @@ class PasswordResetTests(unittest.TestCase):
                     ResetPasswordRequest.model_construct(
                         token=raw_token,
                         new_password="another-password-value",
-                    )
+                    ),
+                    _req(),
                 )
 
     def test_expired_reset_token_is_rejected(self):
@@ -119,7 +131,8 @@ class PasswordResetTests(unittest.TestCase):
                     ResetPasswordRequest.model_construct(
                         token="x" * 43,
                         new_password="new-password-value",
-                    )
+                    ),
+                    _req(),
                 )
             update_token.assert_called_once_with(
                 {"used": True},
