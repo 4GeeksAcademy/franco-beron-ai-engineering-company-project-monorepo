@@ -122,6 +122,7 @@ def list_incidents(
     origin_filter: OriginFilter = None,
     branch_filter: BranchFilter = None,
     category_filter: CategoryFilter = None,
+    current_user=Depends(get_current_user),
 ):
     with operation_errors():
         records = _matching_incidents(
@@ -130,6 +131,15 @@ def list_incidents(
             branch_filter,
             category_filter,
         )
+        role = current_user.get("role", "user")
+        if role == "admin":
+            return [_public_incident(item) for item in records]
+        # Non-admin users only see incidents they reported
+        user_id = current_user.doc_id
+        records = [
+            item for item in records
+            if item.get("reported_by_user_id") == user_id
+        ]
         return [_public_incident(item) for item in records]
 
 
@@ -171,11 +181,19 @@ def incidents_summary(current_user=Depends(get_current_user)):
 
 
 @router.get("/{incident_id}", response_model=CentralIncidentPublic)
-def get_incident(incident_id: int):
+def get_incident(
+    incident_id: int,
+    current_user=Depends(get_current_user),
+):
     with operation_errors():
         incident = central_incidents.get(doc_id=incident_id)
         if incident is None:
             raise HTTPException(status_code=404, detail="Incidencia no encontrada.")
+
+        role = current_user.get("role", "user")
+        if role != "admin" and incident.get("reported_by_user_id") != current_user.doc_id:
+            raise HTTPException(status_code=404, detail="Incidencia no encontrada.")
+
         return _public_incident(incident)
 
 
@@ -186,10 +204,15 @@ def get_incident(incident_id: int):
 def update_incident_status(
     incident_id: int,
     payload: CentralIncidentStatusUpdate,
+    current_user=Depends(get_current_user),
 ):
     with operation_errors():
         incident = central_incidents.get(doc_id=incident_id)
         if incident is None:
+            raise HTTPException(status_code=404, detail="Incidencia no encontrada.")
+
+        role = current_user.get("role", "user")
+        if role != "admin" and incident.get("reported_by_user_id") != current_user.doc_id:
             raise HTTPException(status_code=404, detail="Incidencia no encontrada.")
 
         allowed = STATUS_TRANSITIONS[incident["status"]]

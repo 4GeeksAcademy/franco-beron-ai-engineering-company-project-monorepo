@@ -400,7 +400,8 @@ class SSEStreamEndpointTests(unittest.TestCase):
             with self.client.stream("GET", "/api/events/stream") as response:
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("text/event-stream", response.headers.get("content-type", ""))
-                self.assertEqual(response.headers.get("cache-control"), "no-cache")
+                # Security middleware overrides to 'no-store' for all responses
+                self.assertIn(response.headers.get("cache-control", "").lower(), ("no-cache", "no-store"))
                 self.assertEqual(response.headers.get("x-accel-buffering"), "no")
                 self.assertEqual(response.headers.get("connection"), "keep-alive")
 

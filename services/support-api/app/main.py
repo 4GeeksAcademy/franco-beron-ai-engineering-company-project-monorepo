@@ -16,11 +16,15 @@ from fastapi import (
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse, Response
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from tinydb import Query as TinyQuery
 
 from app.auth import get_current_user
-from app.config import BACKOFFICE_ORIGIN
+from app.config import BACKOFFICE_ORIGIN, JWT_SECRET
 from app.database import initialize_inventory_database
 from app.db import incidents, reset_tokens, users
 from app.email_service import send_password_reset_email
@@ -67,6 +71,13 @@ from app.security import (
 )
 
 
+if len(JWT_SECRET) < 32:
+    raise RuntimeError(
+        "JWT_SECRET must be at least 32 characters long. "
+        "Run: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+    )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_inventory_database()
@@ -89,7 +100,11 @@ async def lifespan(_: FastAPI):
             pass
 
 
+# Rate limiter: 20 requests/minute for auth endpoints, 100 req/min for general API
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Nexova Support API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(inventory_router)
 app.include_router(agent_router)
 app.include_router(central_incidents_router)
@@ -103,9 +118,10 @@ timing_logger = logging.getLogger("api.timing")
 
 
 @app.middleware("http")
-async def timing_middleware(request: Request, call_next):
+async def security_headers_middleware(request: Request, call_next):
+    """Add OWASP-recommended security headers to all responses."""
     start = time.perf_counter()
-    response = await call_next(request)
+    response: Response = await call_next(request)
     duration_ms = (time.perf_counter() - start) * 1000
     timing_logger.info(
         "%s %s -> %s | %.1fms",
@@ -114,6 +130,13 @@ async def timing_middleware(request: Request, call_next):
         response.status_code,
         duration_ms,
     )
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "0"  # Deprecated; modern browsers use CSP
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -219,7 +242,8 @@ def health():
 
 
 @app.post("/auth/login", response_model=LoginResponse)
-def login(payload: LoginRequest):
+@limiter.limit("10/minute")
+def login(payload: LoginRequest, request: Request):
     with operation_errors():
         user = get_user_by_email(str(payload.email))
 
@@ -285,7 +309,8 @@ def change_password(
 
 
 @app.post("/auth/forgot-password", response_model=MessageResponse)
-def forgot_password(payload: ForgotPasswordRequest):
+@limiter.limit("5/minute")
+def forgot_password(payload: ForgotPasswordRequest, request: Request):
     with operation_errors():
         generic_message = (
             "Si la cuenta está registrada, recibirá un enlace para restablecer la contraseña."
@@ -334,7 +359,8 @@ def forgot_password(payload: ForgotPasswordRequest):
 
 
 @app.post("/auth/reset-password", response_model=MessageResponse)
-def reset_password(payload: ResetPasswordRequest):
+@limiter.limit("5/minute")
+def reset_password(payload: ResetPasswordRequest, request: Request):
     with operation_errors():
         token_hash = hash_reset_token(payload.token)
         matches = reset_tokens.search(

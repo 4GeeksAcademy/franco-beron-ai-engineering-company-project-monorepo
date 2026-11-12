@@ -31,6 +31,7 @@ class RFPTicket(SQLModel, table=True):
     pdf_filename: str = Field(default="", nullable=False)
     markdown_path: Optional[str] = Field(default=None)
     error_message: Optional[str] = Field(default=None)
+    owner_user_id: Optional[int] = Field(default=None, nullable=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         nullable=False,
